@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Province Region Builder</title>
+<style>
+  :root { --bg:#f4f1ea; --panel:#fffdf8; --ink:#242424; --muted:#6d6a63; --accent:#2f6f62; --selected:#d89b3d; --line:#b9b3a7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:18px 24px; background:#263b36; color:white; }
+  header h1 { margin:0 0 4px; font-size:24px; }
+  header p { margin:0; opacity:.82; }
+  .app { display:grid; grid-template-columns:minmax(500px, 1.5fr) minmax(360px, .85fr); gap:18px; padding:18px; max-width:1500px; margin:auto; }
+  .panel { background:var(--panel); border:1px solid #d9d2c5; border-radius:12px; box-shadow:0 2px 10px #0000000b; padding:16px; }
+  .map-wrap { position:relative; }
+  #map { width:100%; height:auto; display:block; background:#dbe8e4; border-radius:9px; border:1px solid #b9c8c2; }
+  .province { fill:#eee8da; stroke:#77736b; stroke-width:1.5; cursor:pointer; transition:.12s; }
+  .province:hover { fill:#e3d7bd; stroke:#34312d; stroke-width:2.5; }
+  .province.selected { fill:#d89b3d; stroke:#713f10; stroke-width:3; }
+  .label { pointer-events:none; font-size:13px; font-weight:700; text-anchor:middle; fill:#333; }
+  .selected + .label { fill:#fff; }
+  .map-help { margin:10px 0 0; color:var(--muted); font-size:13px; }
+  .topline { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+  .count { font-weight:800; color:var(--accent); }
+  button { border:0; border-radius:7px; padding:9px 12px; cursor:pointer; font-weight:700; }
+  .secondary { background:#e8e3d9; color:#393733; }
+  .primary { background:var(--accent); color:white; }
+  .danger { background:#ead5d0; color:#6d281d; }
+  .province-editor { border-top:1px solid #ddd6ca; padding-top:14px; margin-top:14px; }
+  .empty { color:var(--muted); padding:20px 4px; }
+  label { display:block; font-size:12px; font-weight:800; margin:10px 0 5px; text-transform:uppercase; letter-spacing:.04em; color:#59564f; }
+  select, input { width:100%; padding:9px; border:1px solid #c9c2b6; border-radius:7px; background:white; font:inherit; }
+  .resource-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px 12px; }
+  .check { display:flex; align-items:center; gap:7px; font-size:13px; }
+  .check input { width:auto; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .output { margin-top:18px; }
+  .output h2 { margin:0 0 8px; font-size:18px; }
+  #description { line-height:1.55; background:#f3efe5; border-left:4px solid var(--accent); padding:12px; border-radius:6px; min-height:90px; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .stat { padding:10px; background:#f7f4ed; border-radius:7px; }
+  .stat b { display:block; font-size:18px; }
+  .small { font-size:12px; color:var(--muted); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:12px; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
+  @media(max-width:900px) { .app { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Interactive Province Region Builder</h1>
+  <p>Select up to 20 provinces, assign their characteristics, and generate a regional land/economic description.</p>
+</header>
+
+<main class="app">
+<section class="panel map-wrap">
+  <div class="topline">
+    <strong>Province Map</strong>
+    <span class="count" id="count">0 / 20 selected</span>
+  </div>
+
+  <svg id="map" viewBox="0 0 1000 650" aria-label="Interactive map of 20 provinces">
+    <!-- Stylized editable 4 x 5 province map. Replace these polygons with real GeoJSON later. -->
+    <g id="provinces"></g>
+  </svg>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#eee8da"></i>Unselected</span>
+    <span><i class="dot" style="background:#d89b3d"></i>Selected</span>
+  </div>
+  <p class="map-help">Click a province to select it. Click a selected province again to deselect it. Select a province to edit its variables in the panel.</p>
+</section>
+
+<section>
+  <div class="panel">
+    <div class="topline">
+      <strong>Province Data</strong>
+      <button class="secondary" id="resetAll">Reset all</button>
+    </div>
+    <div id="editor" class="empty">Click a province on the map to begin.</div>
+  </div>
+
+  <div class="panel output">
+    <h2>Generated Regional Description</h2>
+    <div id="description">Select and configure at least one province.</div>
+    <div id="stats" class="stats"></div>
+    <div class="actions">
+      <button class="primary" id="generate">Generate description</button>
+      <button class="secondary" id="copy">Copy description</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const climates = ["Tropical Rainforest","Tropical Monsoon","Tropical Savanna","Arid Desert","Semi-Arid Steppe","Mediterranean","Temperate Oceanic","Humid Subtropical","Humid Continental","Subarctic","Tundra","Highland"];
+const sectors = ["Agriculture","Pastoralism","Fishing","Forestry","Mining","Hunting/Gathering","Mixed"];
+const secondary = ["None","Food Processing","Textiles","Wood Products","Steel / Metalworking","Machinery","Petrochemicals","Chemical Industry","Construction Materials","Automobiles / Transport","Electronics","Mixed Manufacturing"];
+const resources = ["Fertile Soil","Timber","Fish","Coal","Oil","Natural Gas","Iron","Copper","Gold","Bauxite","Uranium","Rare Earths","Salt","Freshwater","Stone / Limestone"];
+
+const data = {};
+const selected = new Set();
+let active = null;
+
+// Build a stylized 20-province map.
+const svg = document.getElementById("provinces");
+const cols = 5, rows = 4, w = 180, h = 135, ox = 50, oy = 40;
+for (let r=0; r<rows; r++) {
+  for (let c=0; c<cols; c++) {
+    const id = `P${r*cols+c+1}`;
+    const x = ox + c*w, y = oy + r*h;
+    const jitter = ((r+c)%2)*8;
+    const points = `${x+8},${y+8+jitter} ${x+w-8},${y+3} ${x+w-5},${y+h-10} ${x+w-18},${y+h-3} ${x+12},${y+h-8} ${x+4},${y+h/2}`;
+    const poly = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+    poly.setAttribute("points", points);
+    poly.setAttribute("class","province");
+    poly.dataset.id=id;
+    poly.addEventListener("click", () => toggleProvince(id));
+    svg.appendChild(poly);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg","text");
+    text.setAttribute("x", x+w/2); text.setAttribute("y", y+h/2+5);
+    text.setAttribute("class","label"); text.textContent=id;
+    svg.appendChild(text);
+
+    data[id] = {
+      name:id, climate:"Temperate Oceanic", primary:"Agriculture", secondary:"None", resources:[]
+    };
+  }
+}
+
+function optionList(arr, current) {
+  return arr.map(x => `<option ${x===current?"selected":""}>${x}</option>`).join("");
+}
+function resourceChecks(current) {
+  return resources.map(r => `<label class="check"><input type="checkbox" value="${r}" ${current.includes(r)?"checked":""}> ${r}</label>`).join("");
+}
+
+function toggleProvince(id) {
+  if (selected.has(id)) selected.delete(id);
+  else {
+    if (selected.size >= 20) { alert("You can select a maximum of 20 provinces."); return; }
+    selected.add(id);
+  }
+  active = id;
+  updateMap();
+  renderEditor();
+  updateCount();
+  generate();
+}
+function updateMap() {
+  document.querySelectorAll(".province").forEach(p => p.classList.toggle("selected", selected.has(p.dataset.id)));
+}
+function updateCount() { document.getElementById("count").textContent = `${selected.size} / 20 selected`; }
+
+function renderEditor() {
+  if (!active) return;
+  const d = data[active];
+  document.getElementById("editor").innerHTML = `
+    <h3 style="margin:0 0 8px">${active}</h3>
+    <label>Province name</label>
+    <input id="name" value="${escapeHtml(d.name)}">
+    <label>Climate</label>
+    <select id="climate">${optionList(climates,d.climate)}</select>
+    <label>Primary economic sector</label>
+    <select id="primary">${optionList(sectors,d.primary)}</select>
+    <label>Secondary economic sector</label>
+    <select id="secondary">${optionList(secondary,d.secondary)}</select>
+    <label>Natural resources</label>
+    <div class="resource-grid">${resourceChecks(d.resources)}</div>
+    <div class="actions">
+      <button class="primary" id="save">Save province</button>
+      <button class="danger" id="deselect">Deselect province</button>
+    </div>
+  `;
+  document.getElementById("save").onclick = saveProvince;
+  document.getElementById("deselect").onclick = () => {
+    selected.delete(active); updateMap(); updateCount(); renderEditor(); generate();
+  };
+}
+function saveProvince() {
+  const d=data[active];
+  d.name=document.getElementById("name").value || active;
+  d.climate=document.getElementById("climate").value;
+  d.primary=document.getElementById("primary").value;
+  d.secondary=document.getElementById("secondary").value;
+  d.resources=[...document.querySelectorAll("#editor input[type=checkbox]:checked")].map(x=>x.value);
+  generate();
+  alert(`${active} saved.`);
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function counts(key) {
+  const obj={};
+  [...selected].forEach(id => { const v=data[id][key]; obj[v]=(obj[v]||0)+1; });
+  return obj;
+}
+function top(obj) {
+  return Object.entries(obj).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+}
+function pct(n,total) { return total ? Math.round(n/total*100) : 0; }
+
+function generate() {
+  const ids=[...selected], n=ids.length;
+  const box=document.getElementById("description"), stats=document.getElementById("stats");
+  if (!n) { box.textContent="Select and configure at least one province."; stats.innerHTML=""; return; }
+
+  const cc=counts("climate"), pc=counts("primary"), sc=counts("secondary");
+  const climate=top(cc), primary=top(pc), sec=top(sc);
+  const allResources={};
+  ids.forEach(id => data[id].resources.forEach(r => allResources[r]=(allResources[r]||0)+1));
+  const res=Object.entries(allResources).sort((a,b)=>b[1]-a[1]);
+  const significant=res.filter(x=>x[1]>=Math.max(1,Math.ceil(n*.25))).slice(0,5).map(x=>x[0]);
+  const minorityClimates=Object.entries(cc).filter(([k,v])=>k!==climate).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]);
+
+  let climateSentence = `The region is predominantly ${climate.toLowerCase()}.`;
+  if (minorityClimates.length) climateSentence += ` It also contains ${minorityClimates.map(x=>x.toLowerCase()).join(" and ")} areas.`;
+
+  let econ = `Its principal economic activity is ${primary.toLowerCase()}.`;
+  if (sec && sec !== "None") econ += ` ${sec} forms an important secondary economic sector.`;
+  else econ += ` There is no single dominant secondary manufacturing sector across the selected provinces.`;
+
+  let resourceSentence = significant.length
+    ? `Important natural resources include ${joinList(significant.map(x=>x.toLowerCase()))}.`
+    : `The selected provinces do not share a strong common natural-resource base.`;
+
+  let synthesis="";
+  if (primary==="Mining" && significant.length) synthesis=`The economy is strongly resource-oriented, with extraction playing a central role.`;
+  else if (primary==="Agriculture" && significant.includes("Fertile Soil")) synthesis=`Agriculture is likely to be especially productive where fertile soils coincide with suitable climate.`;
+  else if (primary==="Fishing" && significant.includes("Fish")) synthesis=`Fishing and associated coastal or riverine activity are important to the regional economy.`;
+  else if (primary==="Forestry" && significant.includes("Timber")) synthesis=`Forestry is closely tied to the region's timber resources and supports related industries.`;
+  else if (sec && sec!=="None") synthesis=`The combination of primary production and secondary industry gives the region a diversified economic base.`;
+  else synthesis=`The selected provinces form a region whose economic character is primarily shaped by its primary sector.`;
+
+  box.textContent = `${climateSentence} ${econ} ${resourceSentence} ${synthesis}`;
+
+  const resourceText = res.slice(0,4).map(([k,v])=>`${k} (${pct(v,n)}%)`).join(", ") || "None";
+  stats.innerHTML = `
+    <div class="stat"><b>${climate}</b><span class="small">Dominant climate (${pct(cc[climate],n)}%)</span></div>
+    <div class="stat"><b>${primary}</b><span class="small">Dominant primary sector (${pct(pc[primary],n)}%)</span></div>
+    <div class="stat"><b>${sec}</b><span class="small">Most common secondary sector (${pct(sc[sec],n)}%)</span></div>
+    <div class="stat"><b>${resourceText}</b><span class="small">Most common resources</span></div>
+  `;
+}
+function joinList(arr) {
+  if (arr.length===1) return arr[0];
+  if (arr.length===2) return arr.join(" and ");
+  return arr.slice(0,-1).join(", ")+", and "+arr[arr.length-1];
+}
+
+document.getElementById("generate").onclick=generate;
+document.getElementById("copy").onclick=async()=>{
+  const text=document.getElementById("description").textContent;
+  try { await navigator.clipboard.writeText(text); alert("Description copied."); }
+  catch(e) { alert("Copy failed; select the text manually."); }
+};
+document.getElementById("resetAll").onclick=()=>{
+  selected.clear(); active=null;
+  Object.keys(data).forEach(id=>data[id]={name:id,climate:"Temperate Oceanic",primary:"Agriculture",secondary:"None",resources:[]});
+  updateMap(); updateCount();
+  document.getElementById("editor").className="empty";
+  document.getElementById("editor").textContent="Click a province on the map to begin.";
+  generate();
+};
+updateCount(); generate();
+</script>
+</body>
+</html>
