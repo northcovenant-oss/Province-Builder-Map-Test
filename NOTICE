@@ -1,0 +1,29 @@
+NOTICE — Split Licensing
+
+This repository contains two distinct categories of material:
+
+1. THE TOOL (MIT Licensed)
+   - index.html, style.css, map.js, landbio.js
+   - The general structure, schema, and logic of data.js
+   These files are open source under the MIT License (see LICENSE). You're
+   welcome to fork, adapt, and reuse this map/land-claim tool for your own
+   community or project, including commercially, with attribution.
+
+2. WORLD CONTENT (All Rights Reserved)
+   - The specific contents of data.js: province shapes, boundaries, names,
+     and numbering; climate zone data and categorization; economic-output
+     categorization; and any other setting-specific values
+   - Source map files (SVG province map, climate raster, and any other
+     world map assets), whether included in this repo or referenced by it
+   - Any lore, place names, or narrative material tied to this world
+
+   Copyright (c) 2026 [Your Name]. All rights reserved.
+
+   This content is specific to [Community/World Name]'s roleplay setting and
+   is not licensed for reuse. If you'd like to use it for your own community,
+   please reach out for permission rather than assuming the MIT license above
+   covers it — it doesn't.
+
+If you fork this repository to build a similar tool for your own world, the
+expected approach is: keep the MIT-licensed code, and replace data.js (and
+the source map files) with your own content.
