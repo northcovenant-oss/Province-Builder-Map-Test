@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Claim Your Lands</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="map-wrap">
+    <div class="map-frame" id="mapFrame">
+      <div class="title-block">
+        <h1>Claim Your Lands</h1>
+        <p>Select up to 20 provinces to shape your land bio</p>
+      </div>
+      <div class="layer-tabs" id="layerTabs"></div>
+      <div class="no-data-banner" id="noDataBanner"></div>
+      <div class="legend" id="legend"></div>
+      <div class="zoom-controls" id="zoomControls">
+        <button class="zoom-btn" id="zoomIn" title="Zoom in">&#43;</button>
+        <button class="zoom-btn" id="zoomOut" title="Zoom out">&#8722;</button>
+        <button class="zoom-btn zoom-reset" id="zoomReset" title="Reset view">&#8635;</button>
+      </div>
+      <svg id="mapSvg" viewBox="0 0 2709.3333 1354.6666" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Your Claimed Territory</h2>
+    <p class="desc">Click provinces on the map to claim them. Switch layers above the map to preview economic, climate, or terrain data.</p>
+
+    <div class="counter-row">
+      <div><span class="num" id="countNum">0</span><span class="of">&nbsp;/ 20</span></div>
+      <div class="label">Provinces Claimed</div>
+    </div>
+
+    <div class="selected-list" id="selectedList">
+      <div class="empty-state" id="emptyState">No provinces claimed yet.<br>Click the map to begin.</div>
+    </div>
+
+    <div class="limit-msg" id="limitMsg">20 claimed — remove one to add another</div>
+
+    <div class="panel-actions">
+      <button class="btn btn-clear" id="clearBtn">Clear All</button>
+      <button class="btn btn-generate" id="generateBtn" disabled>Generate Land Bio</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="data.js"></script>
+<script src="landbio.js"></script>
+<script src="map.js"></script>
+</body>
+</html>
