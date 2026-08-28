@@ -4,6 +4,7 @@ An interactive map that lets community members claim up to 20 provinces
 and generate a land bio based on their selection. Includes toggleable
 Provinces / Economic Output / Climate / Terrain layers.
 
+Built for the Rylet Nationstates Community
 ## Files
 
 | File | Purpose |
