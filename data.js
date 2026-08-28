@@ -1,6 +1,6 @@
 /*
- * World data for [Community/World Name].
- * Copyright (c) 2026 [Your Name]. All rights reserved.
+ * World data for Rylet.
+ * Copyright (c) 2026 North Covenant. All rights reserved.
  *
  * Unlike the rest of this repository (index.html, style.css, map.js,
  * landbio.js), the contents of this file are NOT covered by the MIT
