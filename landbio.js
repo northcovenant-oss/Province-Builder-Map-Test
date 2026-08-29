@@ -24,6 +24,11 @@
  * Feel free to gut this function entirely and replace it with something
  * template-based, table-driven, or hooked up to an AI API call — as long
  * as it returns a string (or a Promise<string>, see the async note below).
+ *
+ * Also included below: ECON_SECTOR_CONFIG and computeSectorSplit(), which
+ * randomize a Services / Manufacturing / Extraction breakdown for each
+ * province based on its econ category, per-generation. See the comment
+ * above ECON_SECTOR_CONFIG for how to hard-code these instead later.
  */
 
 function generateLandBio(provinces) {
@@ -58,9 +63,101 @@ function generateLandBio(provinces) {
   }
   bio += `.\n\n`;
 
+  // Sector breakdown (Services / Manufacturing / Extraction). Randomized
+  // fresh on every generation — see the block below if you'd rather pin
+  // these down per-province instead of rolling them each time.
+  const sectorSplits = provinces
+    .map(p => computeSectorSplit(p.econ))
+    .filter(Boolean);
+  if (sectorSplits.length > 0) {
+    const totals = computeSectorTotals(sectorSplits);
+    bio += `Across the claimed territory, economic output breaks down to roughly ` +
+      `${totals.Services}% Services, ${totals.Manufacturing}% Manufacturing, and ` +
+      `${totals.Extraction}% Extraction.\n\n`;
+  }
+
   bio += `Claimed provinces: ${provinceList}.`;
 
   return bio;
+}
+
+// ---- economic sector randomization ----
+//
+// Every province's econ category (e.g. "Service Focused", "Mineral Oriented")
+// implies a ranking of three underlying sectors — Services, Manufacturing,
+// and Extraction — and "Focused" vs "Oriented" controls how lopsided the
+// split is. This is computed fresh each time a bio is generated; if you'd
+// rather lock these numbers in per-province instead of re-rolling them
+// every time, this is the place to swap random generation for a lookup
+// against a value stored in data.js.
+
+const ECON_SECTOR_CONFIG = {
+  "Service Focused":      { order: ["Services", "Manufacturing", "Extraction"], magnitude: "focused" },
+  "Service Oriented":     { order: ["Services", "Manufacturing", "Extraction"], magnitude: "oriented" },
+  "Production Focused":   { order: ["Manufacturing", "Services", "Extraction"], magnitude: "focused" },
+  "Energy Focused":       { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
+  "Energy Oriented":      { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+  "Agriculture Focused":  { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
+  "Agriculture Oriented": { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+  "Mineral Focused":      { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
+  "Mineral Oriented":     { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+};
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Returns { Services, Manufacturing, Extraction } percentages (integers,
+// summing to 100) for a single province's econ category, or null if the
+// category isn't recognized.
+function computeSectorSplit(econName) {
+  const config = ECON_SECTOR_CONFIG[econName];
+  if (!config) return null;
+
+  const [primaryKey, secondaryKey, tertiaryKey] = config.order;
+  let primary, secondary;
+
+  if (config.magnitude === "focused") {
+    primary = randInt(70, 90);
+    secondary = randInt(9, 99 - primary);
+  } else {
+    primary = randInt(41, 70);
+    secondary = randInt(9, Math.min(99 - primary, primary));
+  }
+  const tertiary = 100 - primary - secondary;
+
+  return {
+    [primaryKey]: primary,
+    [secondaryKey]: secondary,
+    [tertiaryKey]: tertiary,
+  };
+}
+
+// Averages a list of per-province sector splits into one overall
+// breakdown, rounded to whole percentages that still sum to 100.
+function computeSectorTotals(splits) {
+  const sectors = ["Services", "Manufacturing", "Extraction"];
+  const raw = {};
+  sectors.forEach(s => {
+    raw[s] = splits.reduce((sum, sp) => sum + (sp[s] || 0), 0) / splits.length;
+  });
+
+  const rounded = {};
+  let roundedSum = 0;
+  sectors.forEach(s => {
+    rounded[s] = Math.round(raw[s]);
+    roundedSum += rounded[s];
+  });
+
+  // Rounding can drift the total off 100 by a point or two — nudge the
+  // largest sector to absorb the difference so the displayed total is
+  // always exactly 100%.
+  const diff = 100 - roundedSum;
+  if (diff !== 0) {
+    const largest = sectors.reduce((a, b) => (rounded[a] >= rounded[b] ? a : b));
+    rounded[largest] += diff;
+  }
+  return rounded;
 }
 
 // ---- small helpers ----
