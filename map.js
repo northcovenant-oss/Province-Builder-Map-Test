@@ -13,7 +13,13 @@
   const NS = 'http://www.w3.org/2000/svg';
 
   // ---- Layers ----
-  const NEUTRAL_FILL = '#c9b98c';
+  function getNeutralFill(){
+    // Reads the current theme's neutral land color live, so switching
+    // themes updates the map immediately without map.js needing to know
+    // anything about themes itself. Read off <body> since that's where
+    // theme.js applies the theme-* class.
+    return getComputedStyle(document.body).getPropertyValue('--neutral-fill').trim() || '#c9b98c';
+  }
   const LAYERS = [
     { id: 'provinces', label: 'Provinces', type: 'neutral' },
     { id: 'economic',  label: 'Economic Output', type: 'data' },
@@ -104,7 +110,7 @@
       const el = provinceEls[p.id];
       let fill;
       if(layer.type === 'data'){ fill = p.fill; }
-      else if(layer.type === 'neutral'){ fill = NEUTRAL_FILL; }
+      else if(layer.type === 'neutral'){ fill = getNeutralFill(); }
       else if(layer.type === 'climate'){
         fill = p.climate ? CLIMATE_COLOR[p.climate.dominant] : '#cabf9e';
       }
@@ -424,4 +430,11 @@
   document.getElementById('zoomReset').addEventListener('click', resetView);
 
   applyViewBox();
+
+  // Called by theme.js after switching themes, so the currently-visible
+  // layer (most importantly the neutral "Provinces" fill) repaints with
+  // the new theme's colors right away.
+  window.refreshMapTheme = function(){
+    setLayer(activeLayer);
+  };
 })();
