@@ -260,14 +260,69 @@
     // (with id, label, econ, climate, fill, etc.) for everything claimed,
     // in the order they were claimed.
     const claimedProvinces = selected.map(function(id){ return byId[id]; });
-    const bioText = window.generateLandBio(claimedProvinces);
-    showBioResult(bioText);
+
+    // Open the tab synchronously, in direct response to the click, so
+    // browsers don't treat it as a popup and block it. We fill it in
+    // once the bio text is ready (works whether generateLandBio returns
+    // a plain string or a Promise<string>).
+    const bioWindow = window.open('', '_blank');
+    if (bioWindow) {
+      writeBioPage(bioWindow, claimedProvinces, null, true);
+    }
+
+    Promise.resolve(window.generateLandBio(claimedProvinces)).then(function(bioText){
+      if (bioWindow && !bioWindow.closed) {
+        writeBioPage(bioWindow, claimedProvinces, bioText, false);
+      } else {
+        // Pop-up was blocked or the tab got closed before generation finished.
+        alert('Your browser blocked the new tab. Here\'s the bio instead:\n\n' + bioText);
+      }
+    }).catch(function(err){
+      if (bioWindow && !bioWindow.closed) {
+        writeBioPage(bioWindow, claimedProvinces, 'Something went wrong generating this bio: ' + err.message, false);
+      }
+    });
   });
 
-  function showBioResult(text){
-    // Simple default presentation; swap this out for a nicer modal/panel
-    // whenever you like — it just needs the final bio string.
-    alert(text);
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function writeBioPage(targetWindow, provinces, bioText, loading){
+    const themeClass = Array.from(document.body.classList).find(function(c){ return c.indexOf('theme-') === 0; }) || '';
+    const provinceList = provinces.map(function(p){ return p.label; }).join(', ');
+    const bodyHtml = loading
+      ? '<p class="bio-loading">Writing your land bio&hellip;</p>'
+      : bioText.split(/\n\n+/).map(function(para){
+          return '<p>' + escapeHtml(para).replace(/\n/g, '<br>') + '</p>';
+        }).join('\n');
+
+    const html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n' +
+      '<title>Land Bio' + (provinces.length ? ' \u2014 ' + escapeHtml(provinces[0].label) + (provinces.length > 1 ? ' +' + (provinces.length - 1) : '') : '') + '</title>\n' +
+      '<link rel="stylesheet" href="style.css">\n' +
+      '<style>\n' +
+      '  body.bio-page{ overflow:auto; padding:48px 24px; box-sizing:border-box; background: var(--parchment); }\n' +
+      '  .bio-card{ max-width:680px; margin:0 auto; background: var(--panel-bg); border:1px solid var(--line); border-radius:6px; padding:36px 40px; box-shadow:0 8px 28px rgba(0,0,0,0.2); }\n' +
+      '  .bio-card h1{ font-family:var(--font-display); color:var(--ink); margin:0 0 4px; font-size:24px; }\n' +
+      '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
+      '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
+      '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
+      '  .bio-actions{ margin-top:24px; display:flex; gap:10px; }\n' +
+      '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:10px 16px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:var(--ink); }\n' +
+      '</style>\n</head>\n' +
+      '<body class="bio-page ' + themeClass + '">\n' +
+      '  <div class="bio-card">\n' +
+      '    <h1>Land Bio</h1>\n' +
+      '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
+      '    <div class="bio-body">' + bodyHtml + '</div>\n' +
+      (loading ? '' : '    <div class="bio-actions"><button onclick="window.print()">Print / Save as PDF</button></div>\n') +
+      '  </div>\n</body>\n</html>';
+
+    targetWindow.document.open();
+    targetWindow.document.write(html);
+    targetWindow.document.close();
   }
 
   // crude centroid approximation from path 'd' — averages all coordinate points
