@@ -321,16 +321,16 @@
       writeBioPage(bioWindow, claimedProvinces, null, true);
     }
 
-    Promise.resolve(window.generateLandBio(claimedProvinces)).then(function(bioText){
+    Promise.resolve(window.generateLandBio(claimedProvinces)).then(function(result){
       if (bioWindow && !bioWindow.closed) {
-        writeBioPage(bioWindow, claimedProvinces, bioText, false);
+        writeBioPage(bioWindow, claimedProvinces, result, false);
       } else {
         // Pop-up was blocked or the tab got closed before generation finished.
-        alert('Your browser blocked the new tab. Here\'s the bio instead:\n\n' + bioText);
+        alert('Your browser blocked the new tab. Here\'s the bio instead:\n\n' + result.text);
       }
     }).catch(function(err){
       if (bioWindow && !bioWindow.closed) {
-        writeBioPage(bioWindow, claimedProvinces, 'Something went wrong generating this bio: ' + err.message, false);
+        writeBioPage(bioWindow, claimedProvinces, { text: 'Something went wrong generating this bio: ' + err.message, bbcCode: '' }, false);
       }
     });
   });
@@ -341,13 +341,14 @@
     return div.innerHTML;
   }
 
-  function writeBioPage(targetWindow, provinces, bioText, loading){
+  function writeBioPage(targetWindow, provinces, result, loading){
     const themeClass = Array.from(document.body.classList).find(function(c){ return c.indexOf('theme-') === 0; }) || '';
     const provinceList = provinces.map(function(p){ return p.label; }).join(', ');
     const claimCode = provinces.map(function(p){ return p.label; }).join(', ');
+    const bbcCode = (result && result.bbcCode) || '';
     const bodyHtml = loading
       ? '<p class="bio-loading">Writing your land bio&hellip;</p>'
-      : bioText.split(/\n\n+/).map(function(para){
+      : result.text.split(/\n\n+/).map(function(para){
           return '<p>' + escapeHtml(para).replace(/\n/g, '<br>') + '</p>';
         }).join('\n');
 
@@ -363,18 +364,21 @@
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
       '  .bio-actions{ margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }\n' +
       '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:10px 16px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:var(--ink); }\n' +
+      '  .bio-actions button.copied{ background:var(--gold); }\n' +
       '  .claim-code-block{ margin-top:28px; padding-top:18px; border-top:1px solid var(--line); }\n' +
       '  .claim-code-block .cc-title{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.5px; color:var(--ink-soft); margin-bottom:8px; }\n' +
       '  .claim-code-value{ font-family:var(--font-body); font-size:14px; color:var(--ink); background:rgba(0,0,0,0.04); border:1px solid var(--line); border-radius:4px; padding:10px 12px; word-break:break-word; }\n' +
       '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
       '  .copy-btn.copied{ background:var(--gold); }\n' +
+      '  #bbcSource{ position:absolute; left:-9999px; top:-9999px; }\n' +
       '</style>\n</head>\n' +
       '<body class="bio-page ' + themeClass + '">\n' +
       '  <div class="bio-card">\n' +
       '    <h1>Land Bio</h1>\n' +
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
-      (loading ? '' : '    <div class="bio-actions"><button onclick="window.print()">Print / Save as PDF</button></div>\n') +
+      (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
+                       '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n') +
       '    <div class="claim-code-block">\n' +
       '      <div class="cc-title">Claim Code &mdash; paste this into "Load a Claim Code" on the map to recreate this exact selection</div>\n' +
       '      <div class="claim-code-value" id="claimCodeValue">' + escapeHtml(claimCode) + '</div>\n' +
@@ -382,25 +386,30 @@
       '    </div>\n' +
       '  </div>\n' +
       '  <script>\n' +
-      '    document.getElementById("copyClaimBtn").addEventListener("click", function(){\n' +
-      '      var text = document.getElementById("claimCodeValue").textContent;\n' +
-      '      var btn = this;\n' +
-      '      function done(ok){\n' +
-      '        btn.textContent = ok ? "Copied!" : "Copy failed \u2014 select the text manually";\n' +
-      '        btn.classList.toggle("copied", ok);\n' +
-      '        setTimeout(function(){ btn.textContent = "Copy Claim Code"; btn.classList.remove("copied"); }, 1800);\n' +
-      '      }\n' +
-      '      if(navigator.clipboard && navigator.clipboard.writeText){\n' +
-      '        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });\n' +
-      '      } else {\n' +
-      '        try {\n' +
-      '          var ta = document.createElement("textarea");\n' +
-      '          ta.value = text; document.body.appendChild(ta); ta.select();\n' +
-      '          document.execCommand("copy"); document.body.removeChild(ta);\n' +
-      '          done(true);\n' +
-      '        } catch(e){ done(false); }\n' +
-      '      }\n' +
-      '    });\n' +
+      '    function bindCopyButton(btnId, getText, label){\n' +
+      '      var btn = document.getElementById(btnId);\n' +
+      '      if(!btn) return;\n' +
+      '      btn.addEventListener("click", function(){\n' +
+      '        var text = getText();\n' +
+      '        function done(ok){\n' +
+      '          btn.textContent = ok ? "Copied!" : "Copy failed \u2014 select the text manually";\n' +
+      '          btn.classList.toggle("copied", ok);\n' +
+      '          setTimeout(function(){ btn.textContent = label; btn.classList.remove("copied"); }, 1800);\n' +
+      '        }\n' +
+      '        if(navigator.clipboard && navigator.clipboard.writeText){\n' +
+      '          navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });\n' +
+      '        } else {\n' +
+      '          try {\n' +
+      '            var ta = document.createElement("textarea");\n' +
+      '            ta.value = text; document.body.appendChild(ta); ta.select();\n' +
+      '            document.execCommand("copy"); document.body.removeChild(ta);\n' +
+      '            done(true);\n' +
+      '          } catch(e){ done(false); }\n' +
+      '        }\n' +
+      '      });\n' +
+      '    }\n' +
+      '    bindCopyButton("copyClaimBtn", function(){ return document.getElementById("claimCodeValue").textContent; }, "Copy Claim Code");\n' +
+      '    bindCopyButton("copyBbcBtn", function(){ return document.getElementById("bbcSource").value; }, "Copy BBC Code");\n' +
       '  <\/script>\n' +
       '</body>\n</html>';
 
