@@ -305,6 +305,30 @@
     if(e.key === 'Enter'){ loadClaimCode(claimCodeInput.value); }
   });
 
+  // Wraps buildClaimSnapshotSVG into the HTML block placed near the top of
+  // the bio page — one snapshot per continent the claim touches, side by
+  // side if it spans both.
+  function buildClaimMapHtml(provinces){
+    if(!provinces.length) return '';
+    const byContinent = { north: [], south: [] };
+    provinces.forEach(function(p){
+      (byContinent[p.continent] || byContinent.north).push(p.id);
+    });
+
+    const shots = [];
+    ['north','south'].forEach(function(continentName){
+      const ids = byContinent[continentName];
+      if(!ids || !ids.length) return;
+      const svg = buildClaimSnapshotSVG(continentName, ids);
+      if(!svg) return;
+      const label = continentName === 'north' ? 'Northern Continent' : 'Southern Continent';
+      shots.push('<div class="map-shot">' + svg + '<div class="map-shot-label">' + label + '</div></div>');
+    });
+
+    if(!shots.length) return '';
+    return '    <div class="claim-map"><div class="map-row">' + shots.join('') + '</div></div>\n';
+  }
+
   generateBtn.addEventListener('click', function(){
     // The actual bio-writing logic lives in landbio.js so it can be edited
     // independently of the map. It receives the full province objects
@@ -352,6 +376,8 @@
           return '<p>' + escapeHtml(para).replace(/\n/g, '<br>') + '</p>';
         }).join('\n');
 
+    const mapHtml = loading ? '' : buildClaimMapHtml(provinces);
+
     const html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n' +
       '<title>Land Bio' + (provinces.length ? ' \u2014 ' + escapeHtml(provinces[0].label) + (provinces.length > 1 ? ' +' + (provinces.length - 1) : '') : '') + '</title>\n' +
       '<link rel="stylesheet" href="style.css">\n' +
@@ -362,6 +388,11 @@
       '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
+      '  .claim-map{ margin-bottom:22px; }\n' +
+      '  .claim-map .map-row{ display:flex; gap:12px; flex-wrap:wrap; }\n' +
+      '  .claim-map .map-shot{ flex:1 1 260px; min-width:0; background: var(--parchment); border:1px solid var(--line); border-radius:5px; padding:8px; }\n' +
+      '  .claim-map .map-shot svg{ width:100%; height:auto; display:block; }\n' +
+      '  .claim-map .map-shot-label{ font-family:var(--font-display); font-size:11px; letter-spacing:0.4px; color:var(--ink-soft); text-align:center; margin-top:6px; }\n' +
       '  .bio-actions{ margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }\n' +
       '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:10px 16px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:var(--ink); }\n' +
       '  .bio-actions button.copied{ background:var(--gold); }\n' +
@@ -376,6 +407,7 @@
       '  <div class="bio-card">\n' +
       '    <h1>Land Bio</h1>\n' +
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
+      mapHtml +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
       (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
                        '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n') +
@@ -419,13 +451,13 @@
   }
 
   // crude centroid approximation from path 'd' — averages all coordinate points
-  function centroid(d){
-    const nums = d.match(/-?\d*\.?\d+(?:e-?\d+)?/g);
-    if(!nums) return null;
-    // walk tokens the same way the path is drawn is overkill for a label point;
-    // instead take a simple average of all M/L absolute-ish coordinates by
-    // reconstructing positions with a lightweight state machine.
+  // Shared low-level path-data walker: turns an SVG path 'd' string into
+  // a flat list of [x,y] points it passes through. Used both for the
+  // claim-seal centroid placement and for computing bounding boxes when
+  // building the claim snapshot image on the bio page.
+  function getPathPoints(d){
     const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|-?\d*\.?\d+(?:e-?\d+)?/g);
+    if(!tokens) return [];
     let i=0, cmd=null, cx=0, cy=0, sx=0, sy=0;
     const pts = [];
     function num(){ return parseFloat(tokens[i++]); }
@@ -455,10 +487,84 @@
         default: i++;
       }
     }
+    return pts;
+  }
+
+  function centroid(d){
+    const pts = getPathPoints(d);
     if(pts.length===0) return null;
     let sxs=0, sys=0;
     pts.forEach(function(pt){ sxs+=pt[0]; sys+=pt[1]; });
     return { x: sxs/pts.length, y: sys/pts.length };
+  }
+
+  function pathBBox(d){
+    const pts = getPathPoints(d);
+    if(pts.length===0) return null;
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    pts.forEach(function(pt){
+      if(pt[0]<minX) minX=pt[0];
+      if(pt[0]>maxX) maxX=pt[0];
+      if(pt[1]<minY) minY=pt[1];
+      if(pt[1]>maxY) maxY=pt[1];
+    });
+    return { minX, minY, maxX, maxY };
+  }
+
+  // Bounding box (in shared page coordinates, i.e. after applying that
+  // continent's transform) of every province belonging to one continent.
+  // Computed once per continent and cached, since it only depends on the
+  // static province geometry.
+  const continentBBoxCache = {};
+  function getContinentBBox(continentName){
+    if(continentBBoxCache[continentName]) return continentBBoxCache[continentName];
+    const tfStr = continentName === 'south' ? SOUTH_TRANSFORM : NORTH_TRANSFORM;
+    const m = tfStr && tfStr.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+    const tx = m ? parseFloat(m[1]) : 0;
+    const ty = m ? parseFloat(m[2]) : 0;
+
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    PROVINCES.forEach(function(p){
+      if(p.continent !== continentName) return;
+      const bb = pathBBox(p.d);
+      if(!bb) return;
+      minX = Math.min(minX, bb.minX+tx);
+      minY = Math.min(minY, bb.minY+ty);
+      maxX = Math.max(maxX, bb.maxX+tx);
+      maxY = Math.max(maxY, bb.maxY+ty);
+    });
+    const result = { minX, minY, maxX, maxY, tx, ty };
+    continentBBoxCache[continentName] = result;
+    return result;
+  }
+
+  // Builds a small self-contained inline SVG showing one continent, with
+  // its claimed provinces highlighted the same way they are on the main
+  // map (gold outline). Used to embed a "map of your claim" image on the
+  // generated bio page.
+  function buildClaimSnapshotSVG(continentName, claimedIds){
+    const bb = getContinentBBox(continentName);
+    if(!isFinite(bb.minX)) return '';
+    const pad = (bb.maxX-bb.minX) * 0.06;
+    const x = bb.minX-pad, y = bb.minY-pad;
+    const w = (bb.maxX-bb.minX)+pad*2, h = (bb.maxY-bb.minY)+pad*2;
+
+    const claimedSet = {};
+    claimedIds.forEach(function(id){ claimedSet[id]=true; });
+
+    let paths = '';
+    PROVINCES.forEach(function(p){
+      if(p.continent !== continentName) return;
+      const isClaimed = !!claimedSet[p.id];
+      const fill = isClaimed ? p.fill : '#c9b98c';
+      const strokeCls = isClaimed
+        ? 'stroke="#e0a83e" stroke-width="1.6"'
+        : 'stroke="#2c2417" stroke-width="0.5"';
+      paths += `<path d="${p.d}" fill="${fill}" ${strokeCls}/>`;
+    });
+
+    return `<svg viewBox="${bb.minX-pad} ${bb.minY-pad} ${w} ${h}" xmlns="http://www.w3.org/2000/svg">` +
+      `<g transform="translate(${bb.tx},${bb.ty})">${paths}</g></svg>`;
   }
 
   render();
