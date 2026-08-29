@@ -8,6 +8,28 @@
 <body>
 
 <div class="app">
+  <div class="theme-dropdown" id="themeDropdown">
+    <button class="theme-dropdown-toggle" id="setupToggle" aria-expanded="false">
+      <span class="theme-toggle-icon">&#9679;&#9679;&#9679;</span>
+      <span>Appearance</span>
+      <span class="chevron" id="setupChevron">&#9662;</span>
+    </button>
+    <div class="theme-dropdown-panel" id="setupOptions" hidden>
+      <button class="theme-option" data-theme="parchment">
+        <span class="theme-swatch swatch-parchment"></span>
+        <span class="theme-name">Parchment<br><small>Classic map style</small></span>
+      </button>
+      <button class="theme-option" data-theme="modern">
+        <span class="theme-swatch swatch-modern"></span>
+        <span class="theme-name">Modern<br><small>White continents, blue ocean</small></span>
+      </button>
+      <button class="theme-option" data-theme="dark">
+        <span class="theme-swatch swatch-dark"></span>
+        <span class="theme-name">Dark Mode<br><small>Low-light friendly</small></span>
+      </button>
+    </div>
+  </div>
+
   <div class="map-wrap">
     <div class="map-frame" id="mapFrame">
       <div class="title-block">
@@ -53,5 +75,6 @@
 <script src="data.js"></script>
 <script src="landbio.js"></script>
 <script src="map.js"></script>
+<script src="theme.js"></script>
 </body>
 </html>

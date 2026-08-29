@@ -1,5 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Poppins:wght@500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
+/* ============================================================
+   THEME SYSTEM
+   Three selectable appearances, switched via a class on <body>:
+     (default)        -> Parchment (classic)
+     .theme-modern     -> Modern (white continents, blue ocean)
+     .theme-dark        -> Dark mode
+   Each block only needs to override the variables below; every
+   component in this file reads colors/fonts through them, so a
+   4th theme can be added later without touching component CSS.
+   ============================================================ */
 :root{
   --parchment: #ece0c2;
   --parchment-dark: #ddcda3;
@@ -9,8 +19,43 @@
   --gold-bright: #e0a83e;
   --seal-red: #7a2424;
   --water: #6f97a8;
+  --neutral-fill: #c9b98c;
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Crimson Text', serif;
   --line: rgba(44,36,23,0.35);
   --panel-bg: #f4ead0;
+}
+
+body.theme-modern{
+  --parchment: #eef2f6;
+  --parchment-dark: #4a90d9;
+  --ink: #1c2530;
+  --ink-soft: #51617a;
+  --gold: #2f6fed;
+  --gold-bright: #4d8bff;
+  --seal-red: #e0473e;
+  --water: #3f8fd1;
+  --neutral-fill: #ffffff;
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --line: rgba(28,37,48,0.15);
+  --panel-bg: #ffffff;
+}
+
+body.theme-dark{
+  --parchment: #1b1e26;
+  --parchment-dark: #12141a;
+  --ink: #e9e6df;
+  --ink-soft: #a3a196;
+  --gold: #c9a54a;
+  --gold-bright: #e6c169;
+  --seal-red: #d9564a;
+  --water: #2c4a5e;
+  --neutral-fill: #2e323c;
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Inter', sans-serif;
+  --line: rgba(233,230,223,0.15);
+  --panel-bg: #20232c;
 }
 
 *{ box-sizing:border-box; }
@@ -21,7 +66,7 @@ html,body{
     radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.35), transparent 40%),
     radial-gradient(ellipse at 80% 85%, rgba(0,0,0,0.12), transparent 45%),
     var(--parchment);
-  font-family: 'Crimson Text', serif;
+  font-family: var(--font-body);
   color: var(--ink);
   overflow:hidden;
 }
@@ -69,12 +114,12 @@ html,body{
   left:24px;
   z-index:5;
   pointer-events:none;
-  background: linear-gradient(120deg, rgba(236,224,194,0.92), rgba(236,224,194,0.55) 70%, transparent);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--parchment) 92%, transparent), color-mix(in srgb, var(--parchment) 55%, transparent) 70%, transparent);
   padding:10px 18px 12px 4px;
   border-radius: 0 0 8px 0;
 }
 .title-block h1{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-weight:700;
   font-size:22px;
   letter-spacing:1.5px;
@@ -102,7 +147,7 @@ html,body{
   box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
 .layer-tab{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-size:11.5px;
   letter-spacing:0.4px;
   color: rgba(236,224,194,0.75);
@@ -125,7 +170,7 @@ html,body{
   top:64px;
   right:24px;
   z-index:6;
-  background: rgba(122,36,36,0.92);
+  background: color-mix(in srgb, var(--seal-red) 92%, transparent);
   color: var(--parchment);
   font-size:12.5px;
   font-style:italic;
@@ -143,7 +188,7 @@ html,body{
   bottom:18px;
   right:24px;
   z-index:6;
-  background: rgba(244,234,208,0.95);
+  background: color-mix(in srgb, var(--panel-bg) 95%, transparent);
   border: 1px solid var(--ink);
   border-radius:4px;
   padding:10px 14px;
@@ -191,7 +236,7 @@ html,body{
 }
 .zoom-btn{
   width:30px; height:30px;
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-size:16px;
   color: rgba(236,224,194,0.9);
   background:transparent;
@@ -248,7 +293,7 @@ path.extra-island{
 }
 .seal text{
   fill: var(--parchment);
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-weight:700;
   text-anchor:middle;
   dominant-baseline:central;
@@ -259,7 +304,7 @@ path.extra-island{
   pointer-events:none;
   background: var(--ink);
   color: var(--parchment);
-  font-family:'Crimson Text', serif;
+  font-family: var(--font-body);
   font-size:14px;
   padding:5px 10px;
   border-radius:3px;
@@ -280,12 +325,12 @@ path.extra-island{
   border-left: 2px solid var(--ink);
   display:flex;
   flex-direction:column;
-  padding:26px 22px;
+  padding:64px 22px 26px;
   min-width:0;
 }
 
 .panel h2{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-size:19px;
   letter-spacing:1px;
   margin:0 0 4px;
@@ -299,6 +344,89 @@ path.extra-island{
   line-height:1.4;
 }
 
+.theme-dropdown{
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  font-family: var(--font-body);
+}
+.theme-dropdown-toggle{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 9px 14px;
+  cursor:pointer;
+  font-family: var(--font-display);
+  font-size:13px;
+  letter-spacing:0.4px;
+  color: var(--ink);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+}
+.theme-toggle-icon{
+  font-size:9px;
+  letter-spacing:1px;
+  color: var(--gold);
+}
+.theme-dropdown-toggle .chevron{
+  font-size:10px;
+  color: var(--ink-soft);
+  transition: transform 0.15s ease;
+}
+.theme-dropdown-toggle[aria-expanded="true"] .chevron{ transform: rotate(180deg); }
+
+.theme-dropdown-panel{
+  position:absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 230px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.theme-dropdown-panel[hidden]{ display:none; }
+.theme-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 9px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--line);
+  border-radius:4px;
+  cursor:pointer;
+  text-align:left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.theme-option:hover{ background: rgba(0,0,0,0.06); }
+.theme-option.active{
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+.theme-swatch{
+  width:28px; height:28px;
+  border-radius:4px;
+  flex-shrink:0;
+  border:1px solid var(--line);
+}
+.swatch-parchment{ background: linear-gradient(135deg, #ece0c2 50%, #78b464 50%); }
+.swatch-modern{ background: linear-gradient(135deg, #4a90d9 50%, #ffffff 50%); }
+.swatch-dark{ background: linear-gradient(135deg, #12141a 50%, #2e323c 50%); }
+.theme-name{
+  font-family: var(--font-body);
+  font-size:13px;
+  color: var(--ink);
+  line-height:1.35;
+}
+.theme-name small{ color: var(--ink-soft); font-size:11.5px; font-style:italic; }
+
 .counter-row{
   display:flex;
   align-items:baseline;
@@ -309,7 +437,7 @@ path.extra-island{
   margin-bottom:14px;
 }
 .counter-row .num{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-size:26px;
   color: var(--seal-red);
 }
@@ -358,7 +486,7 @@ path.extra-island{
   to{ opacity:1; transform: translateX(0); }
 }
 .item .order{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   font-size:12px;
   width:20px; height:20px;
   border-radius:50%;
@@ -401,7 +529,7 @@ path.extra-island{
 }
 
 button.btn{
-  font-family:'Cinzel', serif;
+  font-family: var(--font-display);
   letter-spacing:0.5px;
   font-size:13.5px;
   padding:11px 14px;
