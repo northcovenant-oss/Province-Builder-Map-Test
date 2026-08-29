@@ -64,6 +64,15 @@
 
     <div class="limit-msg" id="limitMsg">20 claimed — remove one to add another</div>
 
+    <div class="claim-code-section">
+      <label class="claim-code-label" for="claimCodeInput">Load a Claim Code</label>
+      <div class="claim-code-row">
+        <input type="text" id="claimCodeInput" class="claim-code-input" placeholder="e.g. S9, S12, N4" autocomplete="off">
+        <button class="btn btn-load" id="loadClaimBtn">Load</button>
+      </div>
+      <div class="claim-code-msg" id="claimCodeMsg"></div>
+    </div>
+
     <div class="panel-actions">
       <button class="btn btn-clear" id="clearBtn">Clear All</button>
       <button class="btn btn-generate" id="generateBtn" disabled>Generate Land Bio</button>

@@ -572,6 +572,62 @@ button.btn-generate:disabled{
 }
 .limit-msg.show{ opacity:1; }
 
+.claim-code-section{
+  border-top:1px solid var(--line);
+  padding-top:14px;
+  margin-top:14px;
+}
+.claim-code-label{
+  display:block;
+  font-family: var(--font-display);
+  font-size:12.5px;
+  letter-spacing:0.5px;
+  color: var(--ink-soft);
+  margin-bottom:7px;
+}
+.claim-code-row{
+  display:flex;
+  gap:8px;
+}
+.claim-code-input{
+  flex:1 1 auto;
+  min-width:0;
+  font-family: var(--font-body);
+  font-size:13.5px;
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:4px;
+  background: rgba(255,255,255,0.4);
+  color: var(--ink);
+}
+.claim-code-input:focus{
+  outline:none;
+  border-color: var(--gold);
+}
+button.btn-load{
+  font-family: var(--font-display);
+  font-size:13px;
+  letter-spacing:0.4px;
+  padding:9px 16px;
+  border-radius:4px;
+  border:1px solid var(--ink);
+  background: var(--panel-bg);
+  color: var(--ink);
+  cursor:pointer;
+  flex:0 0 auto;
+}
+button.btn-load:hover{ background: rgba(0,0,0,0.05); }
+.claim-code-msg{
+  font-size:12.5px;
+  color: var(--ink-soft);
+  margin-top:7px;
+  min-height:16px;
+  opacity:0;
+  transition: opacity 0.15s ease;
+}
+.claim-code-msg.show{ opacity:1; }
+.claim-code-msg.warning{ color: var(--seal-red); }
+
 @media (max-width: 820px){
   .app{ flex-direction:column-reverse; }
   .panel{ flex-basis:auto; height:42vh; border-left:none; border-top:2px solid var(--ink); }

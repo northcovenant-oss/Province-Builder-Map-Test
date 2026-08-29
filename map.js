@@ -90,6 +90,9 @@
   const byId = {};
   PROVINCES.forEach(function(p){ byId[p.id] = p; });
 
+  const byLabel = {};
+  PROVINCES.forEach(function(p){ byLabel[p.label.toUpperCase()] = p; });
+
   // ---- Layer tab bar ----
   const layerTabs = document.getElementById('layerTabs');
   const noDataBanner = document.getElementById('noDataBanner');
@@ -254,6 +257,54 @@
     render();
   });
 
+  // ---- Load a Claim Code ----
+  // Lets someone paste a previously-copied list of province labels
+  // (e.g. "S9, S12, N4") and instantly restore that selection.
+  const claimCodeInput = document.getElementById('claimCodeInput');
+  const claimCodeMsg = document.getElementById('claimCodeMsg');
+  const loadClaimBtn = document.getElementById('loadClaimBtn');
+
+  function loadClaimCode(raw){
+    const tokens = raw.split(/[,\s]+/).map(function(t){ return t.trim().toUpperCase(); }).filter(Boolean);
+    if(tokens.length === 0){
+      setClaimMsg('Paste a claim code first.', true);
+      return;
+    }
+    const found = [];
+    const unknown = [];
+    const seen = {};
+    tokens.forEach(function(tok){
+      const p = byLabel[tok];
+      if(!p){ unknown.push(tok); return; }
+      if(seen[p.id]) return; // skip duplicates
+      seen[p.id] = true;
+      found.push(p.id);
+    });
+
+    const truncated = found.length > MAX_SELECT;
+    selected = found.slice(0, MAX_SELECT);
+    render();
+
+    const parts = [];
+    parts.push(selected.length + ' province' + (selected.length === 1 ? '' : 's') + ' loaded.');
+    if(truncated) parts.push('Only the first ' + MAX_SELECT + ' were used.');
+    if(unknown.length) parts.push('Not found: ' + unknown.join(', ') + '.');
+    setClaimMsg(parts.join(' '), unknown.length > 0);
+  }
+
+  function setClaimMsg(text, isWarning){
+    claimCodeMsg.textContent = text;
+    claimCodeMsg.classList.toggle('warning', !!isWarning);
+    claimCodeMsg.classList.add('show');
+  }
+
+  loadClaimBtn.addEventListener('click', function(){
+    loadClaimCode(claimCodeInput.value);
+  });
+  claimCodeInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ loadClaimCode(claimCodeInput.value); }
+  });
+
   generateBtn.addEventListener('click', function(){
     // The actual bio-writing logic lives in landbio.js so it can be edited
     // independently of the map. It receives the full province objects
@@ -293,6 +344,7 @@
   function writeBioPage(targetWindow, provinces, bioText, loading){
     const themeClass = Array.from(document.body.classList).find(function(c){ return c.indexOf('theme-') === 0; }) || '';
     const provinceList = provinces.map(function(p){ return p.label; }).join(', ');
+    const claimCode = provinces.map(function(p){ return p.label; }).join(', ');
     const bodyHtml = loading
       ? '<p class="bio-loading">Writing your land bio&hellip;</p>'
       : bioText.split(/\n\n+/).map(function(para){
@@ -309,8 +361,13 @@
       '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
-      '  .bio-actions{ margin-top:24px; display:flex; gap:10px; }\n' +
+      '  .bio-actions{ margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }\n' +
       '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:10px 16px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:var(--ink); }\n' +
+      '  .claim-code-block{ margin-top:28px; padding-top:18px; border-top:1px solid var(--line); }\n' +
+      '  .claim-code-block .cc-title{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.5px; color:var(--ink-soft); margin-bottom:8px; }\n' +
+      '  .claim-code-value{ font-family:var(--font-body); font-size:14px; color:var(--ink); background:rgba(0,0,0,0.04); border:1px solid var(--line); border-radius:4px; padding:10px 12px; word-break:break-word; }\n' +
+      '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
+      '  .copy-btn.copied{ background:var(--gold); }\n' +
       '</style>\n</head>\n' +
       '<body class="bio-page ' + themeClass + '">\n' +
       '  <div class="bio-card">\n' +
@@ -318,7 +375,34 @@
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
       (loading ? '' : '    <div class="bio-actions"><button onclick="window.print()">Print / Save as PDF</button></div>\n') +
-      '  </div>\n</body>\n</html>';
+      '    <div class="claim-code-block">\n' +
+      '      <div class="cc-title">Claim Code &mdash; paste this into "Load a Claim Code" on the map to recreate this exact selection</div>\n' +
+      '      <div class="claim-code-value" id="claimCodeValue">' + escapeHtml(claimCode) + '</div>\n' +
+      '      <button class="copy-btn" id="copyClaimBtn">Copy Claim Code</button>\n' +
+      '    </div>\n' +
+      '  </div>\n' +
+      '  <script>\n' +
+      '    document.getElementById("copyClaimBtn").addEventListener("click", function(){\n' +
+      '      var text = document.getElementById("claimCodeValue").textContent;\n' +
+      '      var btn = this;\n' +
+      '      function done(ok){\n' +
+      '        btn.textContent = ok ? "Copied!" : "Copy failed \u2014 select the text manually";\n' +
+      '        btn.classList.toggle("copied", ok);\n' +
+      '        setTimeout(function(){ btn.textContent = "Copy Claim Code"; btn.classList.remove("copied"); }, 1800);\n' +
+      '      }\n' +
+      '      if(navigator.clipboard && navigator.clipboard.writeText){\n' +
+      '        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });\n' +
+      '      } else {\n' +
+      '        try {\n' +
+      '          var ta = document.createElement("textarea");\n' +
+      '          ta.value = text; document.body.appendChild(ta); ta.select();\n' +
+      '          document.execCommand("copy"); document.body.removeChild(ta);\n' +
+      '          done(true);\n' +
+      '        } catch(e){ done(false); }\n' +
+      '      }\n' +
+      '    });\n' +
+      '  <\/script>\n' +
+      '</body>\n</html>';
 
     targetWindow.document.open();
     targetWindow.document.write(html);
