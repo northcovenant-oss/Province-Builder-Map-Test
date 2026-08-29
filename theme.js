@@ -13,7 +13,7 @@
 
 (function(){
   const STORAGE_KEY = 'landClaimTheme';
-  const DEFAULT_THEME = 'parchment';
+  const DEFAULT_THEME = 'modern';
 
   const toggleBtn = document.getElementById('setupToggle');
   const optionsPanel = document.getElementById('setupOptions');
