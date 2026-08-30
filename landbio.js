@@ -72,8 +72,9 @@ function computeEconomics(provinces) {
     .filter(entry => entry.split);
   const sectorSplits = perProvinceSectors.map(entry => entry.split);
   const sectorTotals = sectorSplits.length > 0 ? computeSectorTotals(sectorSplits) : null;
+  const classification = sectorTotals ? classifyEconomy(sectorTotals) : null;
 
-  return { continents, climates, econs, topClimate, topEcon, sectorTotals, perProvinceSectors };
+  return { continents, climates, econs, topClimate, topEcon, sectorTotals, perProvinceSectors, classification };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -108,15 +109,17 @@ function buildBioText(provinces, econ) {
     bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
       `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
 
-    const classification = classifyEconomy(t);
+    const classification = econ.classification;
     bio += `Economic Classification: ${classification.name}` +
       (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `.\n\n`;
+    const desc = ECONOMY_DESCRIPTIONS[classification.name];
+    if (desc) bio += `${desc}\n\n`;
   }
 
   // TESTING ONLY - remove this block once the Light/Heavy Industry formula
   // is confirmed correct. It lists each province's own roll (rather than
   // just the blended claim-wide total above) so the per-province math can
-  // actually be checked against ECON_SECTOR_CONFIG / PRIMARY_RANGE /
+  // actually be checked against ECON_SECTOR_CONFIG / LIGHT_INDUSTRY_FACTOR,
   // LIGHT_INDUSTRY_FACTOR, not just trusted from the average.
   if (econ.perProvinceSectors && econ.perProvinceSectors.length > 0) {
     bio += `[Testing] Per-province sector breakdown:\n`;
@@ -196,7 +199,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 
 [b]Economy[/b][list]| {{PRIMARY_PCT}}% | {{SECONDARY_PCT}}% | {{TERTIARY_PCT}}% |
 [*][u]Economy Type[/u]: 
- [i]{{ECON_TYPE}}[/i][list][*]
+ [i]{{ECON_TYPE}}[/i][list][*]{{ECON_TYPE_DESC}}
 [/list][*][u]World Exports[/u]: 
  [list]| 1[sup]st[/sup] :  | 2[sup]nd[/sup] : | 3[sup]rd[/sup] : | 4[sup]th[/sup] : | 5[sup]th[/sup] :  |[/list] 
  [*][i]Please look over the [url=[/url] to understand how your economy fits into the region.[/i][/list] 
@@ -226,9 +229,18 @@ function buildBBCCode(provinces, econ) {
   const detail = CLIMATE_DETAILS[econ.topClimate];
   const climateBlock = detail ? detail.bbc : `[i]${econ.topClimate}[/i][list][u]Season(s):[/u][list][/list][u]Features:[/u][list][/list][u]Agriculture:[/u][list][/list][u]Examples:[/u][list][/list][u]External Link:[/u][list][/list][/list]`;
 
+  // The classification (Service Economy, Industrial Economy, etc.) rather
+  // than the per-province econ category (Service Focused, etc.) - this
+  // template slot's existing empty "[list][*]...[/list]" bullet was
+  // clearly built to hold a description of an economy archetype like
+  // these, not the more granular per-province category.
+  const econType = econ.classification ? econ.classification.name : econ.topEcon;
+  const econTypeDesc = econ.classification ? (ECONOMY_DESCRIPTIONS[econ.classification.name] || "") : "";
+
   return BBC_TEMPLATE
     .replace("{{CLIMATE_BLOCK}}", climateBlock)
-    .replace("{{ECON_TYPE}}", econ.topEcon)
+    .replace("{{ECON_TYPE}}", econType)
+    .replace("{{ECON_TYPE_DESC}}", econTypeDesc)
     .replace("{{PRIMARY_PCT}}", primaryPct)
     .replace("{{SECONDARY_PCT}}", secondaryPct)
     .replace("{{TERTIARY_PCT}}", tertiaryPct);
@@ -311,44 +323,23 @@ const CLIMATE_DETAILS = {
 //
 // Every province's econ category (e.g. "Service Focused", "Mineral Oriented")
 // implies a ranking of three underlying sectors — Services, Manufacturing,
-// and Extraction. The primary sector's percentage is randomized per-category
-// using PRIMARY_RANGE below; "Focused" vs "Oriented" then controls how the
-// remaining percentage splits between secondary and tertiary. This is
-// computed fresh each time a bio is generated; if you'd rather lock these
-// numbers in per-province instead of re-rolling them every time, this is
-// the place to swap random generation for a lookup against a value stored
-// in data.js.
+// and Extraction — and "Focused" vs "Oriented" controls how lopsided the
+// split is. This is computed fresh each time a bio is generated; if you'd
+// rather lock these numbers in per-province instead of re-rolling them
+// every time, this is the place to swap random generation for a lookup
+// against a value stored in data.js.
 
 const ECON_SECTOR_CONFIG = {
   "Service Focused":      { order: ["Services", "Manufacturing", "Extraction"], magnitude: "focused" },
   "Service Oriented":     { order: ["Services", "Manufacturing", "Extraction"], magnitude: "oriented" },
   "Production Focused":   { order: ["Manufacturing", "Services", "Extraction"], magnitude: "focused" },
   "Energy Focused":       { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
-  "Energy Oriented":      { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+  "Energy Oriented":      { order: ["Manufacturing", "Extraction", "Services"], magnitude: "oriented" },
   "Agriculture Focused":  { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
-  "Agriculture Oriented": { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+  "Agriculture Oriented": { order: ["Manufacturing", "Extraction", "Services"], magnitude: "oriented" },
   "Mineral Focused":      { order: ["Extraction", "Services", "Manufacturing"], magnitude: "focused" },
-  "Mineral Oriented":     { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
+  "Mineral Oriented":     { order: ["Manufacturing", "Extraction", "Services"], magnitude: "oriented" },
 };
-
-// Primary sector's percentage is rolled within this per-category range
-// (inclusive), replacing the old flat 70–90 (focused) / 41–70 (oriented)
-// ranges with tighter, category-specific ones.
-const PRIMARY_RANGE = {
-  "Agriculture Focused":  [55, 75],
-  "Agriculture Oriented": [40, 60],
-  "Production Focused":   [45, 70],
-  "Service Focused":      [50, 75],
-  "Service Oriented":     [35, 55],
-  "Mineral Focused":      [55, 75],
-  "Mineral Oriented":     [40, 60],
-  "Energy Focused":       [55, 75],
-  "Energy Oriented":      [40, 60],
-};
-
-// The tertiary (3rd) sector always gets at least this many percentage
-// points, no matter how primary and secondary roll.
-const TERTIARY_MIN_PCT = 8;
 
 // Manufacturing is further split into Light Industry and Heavy Industry.
 // Light Industry = Manufacturing % × this factor (rounded); Heavy Industry
@@ -374,21 +365,51 @@ function randInt(min, max) {
 // percentages (integers) for a single province's econ category, or null if
 // the category isn't recognized. Services + Manufacturing + Extraction sum
 // to 100; LightIndustry + HeavyIndustry sum to exactly Manufacturing.
+//
+// Primary rolls 70-90% for Focused categories, 41-70% for Oriented ones;
+// secondary and tertiary split whatever's left, with Oriented additionally
+// keeping secondary from exceeding primary.
+//
+// Service Focused / Service Oriented get one further adjustment: Extraction
+// (their tertiary sector) is kept under EXTRACTION_CAP_PCT (~10%), since a
+// service economy should have very little raw resource extraction. Keeping
+// secondary <= primary while also forcing tertiary that low requires
+// primary to be at least MIN_FEASIBLE_PRIMARY_FOR_CAP - Service Focused's
+// range (70-90) already always clears that on its own, but Service
+// Oriented's normal range (41-70) doesn't reach it for every roll. Rather
+// than rolling in the full 41-70 range and pushing low rolls up to the
+// floor (which piles up a disproportionate share of rolls on exactly 46),
+// Service Oriented rolls its primary directly within the feasible
+// 46-70 window, so every value in range is equally likely.
+const EXTRACTION_CAP_PCT = 10;
+const EXTRACTION_CAPPED_ECONS = ["Service Focused", "Service Oriented"];
+const MIN_FEASIBLE_PRIMARY_FOR_CAP = Math.ceil((101 - EXTRACTION_CAP_PCT) / 2); // = 46 at a 10% cap
+
 function computeSectorSplit(econName) {
   const config = ECON_SECTOR_CONFIG[econName];
   if (!config) return null;
 
   const [primaryKey, secondaryKey, tertiaryKey] = config.order;
-  const range = PRIMARY_RANGE[econName] || (config.magnitude === "focused" ? [70, 90] : [41, 70]);
-  const primary = randInt(range[0], range[1]);
+  const isCapped = EXTRACTION_CAPPED_ECONS.indexOf(econName) !== -1;
+  let primary, secondary;
 
-  // Secondary is capped two ways at once: it can never exceed the primary
-  // (hence the `primary` term below), and the tertiary sector must be left
-  // with at least TERTIARY_MIN_PCT (8%) once primary and secondary are
-  // both subtracted from 100 (hence the `100 - TERTIARY_MIN_PCT - primary`
-  // term). Both apply the same way regardless of Focused vs Oriented.
-  const secondaryMax = Math.min(100 - TERTIARY_MIN_PCT - primary, primary);
-  const secondary = randInt(9, secondaryMax);
+  if (config.magnitude === "focused") {
+    primary = randInt(70, 90); // already always >= MIN_FEASIBLE_PRIMARY_FOR_CAP
+  } else if (isCapped) {
+    primary = randInt(MIN_FEASIBLE_PRIMARY_FOR_CAP, 70);
+  } else {
+    primary = randInt(41, 70);
+  }
+
+  if (isCapped) {
+    const secondaryMax = Math.min(primary, 99 - primary);
+    const secondaryMin = Math.min(secondaryMax, Math.max(9, (101 - EXTRACTION_CAP_PCT) - primary));
+    secondary = randInt(secondaryMin, secondaryMax);
+  } else if (config.magnitude === "focused") {
+    secondary = randInt(9, 99 - primary);
+  } else {
+    secondary = randInt(9, Math.min(99 - primary, primary));
+  }
   const tertiary = 100 - primary - secondary;
 
   const split = {
@@ -496,6 +517,36 @@ function classifyEconomy(sectorTotals) {
   pool.sort((a, b) => b.pct - a.pct);
   return pool[0];
 }
+
+// Plain-text description per classification, used both in the on-page bio
+// prose and (via buildBBCCode) inside the BBC template's Economy Type
+// bullet. "Diversified Economy" isn't one of the ten named types - it's
+// this file's own fallback for claims too evenly split to hit any of the
+// >50% thresholds - so it gets a short description written to match here
+// rather than one from the original set.
+const ECONOMY_DESCRIPTIONS = {
+  "Service Economy": "Service Economies are highly specialized economies in which the tertiary sector is the dominant force in the economy. The tertiary sector consists of activities where people offer their knowledge and time to improve productivity, performance, potential, and sustainability. Unlike goods services are intangible in nature. The goal of the economy is to export services, while importing finished goods, consumer goods, and services from other states. Competition, demand, and trade will shape the service industry dramatically. The state is heavily reliant on imported goods of all kinds. Competition can be fierce so finding a specialized market is ideal. Pollution is minimal.",
+
+  "Consumer Goods Economy": "Consumer Goods Economies are highly specialized in the light secondary sector. They are focused on the creation of consumer goods, as contrasted by industrial economies which are oriented towards intermediate and final products. The goal of the economy is to export its consumer goods while importing raw material, finished goods, and services from other states. The resources on hand, trade, and the priorities of your nation will influence what type of refinement and manufacturing will take place within the country. The state is reliant on importation of raw materials from other states to be manufactured into consumer goods, as well as needing finished goods and services. Competition can be high so finding a specialized market is ideal. Pollution is a concern for many of these economies but investment into cleaner practices can help limit such issues.",
+
+  "Industrial Economy": "Industrial Economies are highly specialized in the heavy secondary sector. They are oriented towards intermediate and finished goods intended for other industries and require large capital investment. They are contrasted by consumer goods economies, which focuses on the creation of consumer goods. The goal of the economy is to export its intermediate and finished goods while importing raw material, other finished goods, and services from other states. The resources on hand, trade, and the priorities of your nation will influence what type of refinement and manufacturing will take place within the country. The state is reliant on importation of raw materials, and intermediate goods from other states to be manufactured into finished goods, as well as needing consumer goods and services. Competition can be high so finding a specialized market is ideal. Environmental Damage and Pollution are major concerns for heavy industries as they produce a large amount of waste material.",
+
+  "Resource Economy": "Resource Economies are highly specialized in the primary sector. They are focused on the cultivation and extraction of natural resources. Resource economies have various forms depending on the natural resources available. The goal of the economy is to export its raw materials while importing finished goods, consumer goods, and services from other states. The natural resources at your disposal will influence what type of production will take place within the country ie extraction of raw materials or cultivation of agriculture. The state is reliant on importation of goods and services. Although considered at the of the international economy resource based nations are the foundation of the economic order allowing them the power to severely damage the economics of unfriendly nations through embargoes. Environmental damage is a concern for many of these economies from mining and fracking to soil erosion and pesticide usage.",
+
+  "Consumer Goods & Services Economy": "Consumer Goods & Services Economy has a mixture of tertiary and light secondary sectors as the dominant force in the country. The economy is focused on creating and selling consumer goods. The service sector and the light manufacturing sector are the primary outputs of your economy, making up a sizable portion of the economy. The goal of the economy is to export services as well as finished goods, while importing parts, other finished goods, and services from other states. Competition, demand, and trade will shape the service industry dramatically while the resources on hand, and the priorities of your nation will influence what type of manufacturing will take place within the country. The state is reliant on the importation of raw materials and finished goods. Competition can be fierce so finding a specialized market is ideal. Pollution is a concern for some of these economies but investment into cleaner practices can help limit such issues.",
+
+  "Consumer Goods & Materials Economy": "Consumer Goods & Materials Economies are based around Primary and Light Secondary activities. The economy is focused on raw material extraction and creating consumer goods. Light Manufacturing and Extraction are the primary outputs of your economy, making up a sizable portion of the economy. The goal of the economy is to extract raw materials for export or usage in the production of Consumer goods, while importing finished goods, and services from other states. Competition, demand, and trade will shape the service industry dramatically while the resources on hand, and the priorities of your nation will influence what type of manufacturing will take place within the country. The state is reliant on the importation of finished goods and services. Competition can be high so finding a specialized market is ideal. Environmental damage is a concern for many of these economies from mining and fracking to soil erosion and pesticide usage.",
+
+  "Manufacturing Economy": "Manufacturing Economies are based around Secondary activities. The economy is focused on creating intermediate, finished, and consumer goods. Light Manufacturing and Heavy Manufacturing are the primary outputs of your economy, making up a sizable portion of the economy. The goal of the economy is to export its intermediate, final, and consumer goods, while importing raw materials, and services from other states. Competition, demand, and trade will shape the service industry dramatically while the resources on hand, and the priorities of your nation will influence what type of manufacturing will take place within the country. The state is reliant on the importation of raw materials and services. Competition can be high so finding a specialized market is ideal. Environmental Damage and Pollution are major concerns for manufacturing economies as they produce a large amount of waste material.",
+
+  "Industrial Goods & Services Economy": "Industrial & Services Economies are based around Tertiary and Heavy Secondary activities. The economy is focused on creating and selling intermediate and finished goods intended for use in other businesses. Services and Heavy Manufacturing are the primary outputs of your economy, making up a sizable portion of the economy. The goal of the economy is to export its services and, intermediate/final goods, while importing, raw materials, and consumer goods and services from other states. Competition, demand, and trade will shape the service industry dramatically while the resources on hand, and the priorities of your nation will influence what type of manufacturing will take place within the country. The state is reliant on the importation of raw materials and consumer goods. Competition can be high so finding a specialized market is ideal. Environmental Damage and Pollution are major concerns for heavy industries as they produce a large amount of waste material.",
+
+  "Industrial Goods & Materials Economy": "Industrial Goods & Materials Economies are based around Primary and Heavy Secondary activities. The economy is focused on raw material extraction and creating intermediate and final goods. Heavy Manufacturing and Extraction are the primary outputs of your economy, making up a sizable portion of the economy. The goal of the economy is to extract raw materials for export or usage in the production of intermediate and final goods, while importing consumer goods, and services from other states. Competition, demand, and trade will shape the service industry dramatically while the resources on hand, and the priorities of your nation will influence what type of manufacturing will take place within the country. The state is reliant on the importation of consumer goods and services. Competition can be high so finding a specialized market is ideal. Environmental damage is a major concern for many of these economies from mining and fracking to soil erosion and pesticide usage, as well as pollution from heavy industries.",
+
+  "Non-Industrial Economy": "Non-industrial Economies are based around Primary and Tertiary activities. The economy is focused on raw material extraction and services. Services and Extraction are the primary outputs of your economy, making up a sizable portion of the economy. These economies usually emerge from resource rich nations who have grown economically to the point of supporting a large Service industry but have not caught up infrastructure to support a secondary sector. The existence of the service economy is almost entirely reliant on the raw resource and usually is the source of wealth of the consumers and or focus of the service industry through the trade of resource. Commonly found in petrol states, it is considered highly unstable and many attempt to use the momentary wealth to diversify the economy either through creating a strong independent service economy bypassing the other or the catching up of the other sectors to build a more stable basis. The state is reliant on the importation of most goods. Environmental damage is a concern for many of these economies from mining and fracking to soil erosion and pesticide usage.",
+
+  "Diversified Economy": "Diversified Economies have no single sector, or pair of sectors, that clearly dominates output - Services, Manufacturing, and Extraction each contribute a meaningful share. This spread-out base can make the economy more resilient to a downturn in any one sector, but also means it lacks the sharp specialization (and the trade leverage that comes with it) of a more focused economy. Trade tends to be broad rather than deep, importing and exporting across many categories instead of concentrating on one export and a handful of imports.",
+};
 
 // ---- small helpers ----
 
