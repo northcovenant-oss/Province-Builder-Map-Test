@@ -208,7 +208,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
  [i]{{ECON_TYPE}}[/i][list][*]{{ECON_TYPE_DESC}}
 [/list][*][u]World Exports[/u]: 
  [list]| 1[sup]st[/sup] : {{EXPORT_1}} | 2[sup]nd[/sup] : {{EXPORT_2}} | 3[sup]rd[/sup] : {{EXPORT_3}} | 4[sup]th[/sup] : {{EXPORT_4}} | 5[sup]th[/sup] : {{EXPORT_5}} |[/list] 
- [*][i]Please look over the [url=https://www.nationstates.net/page=dispatch/id=737839]Economic Guide[/url] to understand how your economy fits into the region.[/i][/list] 
+ [*][i]Please look over the [url=https://www.nationstates.net/page=dispatch/id=2811225]Economic Guide[/url] to understand how your economy fits into the region.[/i][/list] 
 
 [b]Resources & Production[/b]:
 [list][*][u]Resources[/u]:
