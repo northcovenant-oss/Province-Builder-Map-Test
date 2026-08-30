@@ -99,7 +99,7 @@ function buildBioText(provinces, econ) {
   bio += buildClimateParagraphs(provinces, econ);
 
   bio += `## Economy\n\n`;
-  bio += `Economy Type: ${econ.topEcon}`;
+  bio += `The regional economy leans toward ${econ.topEcon}`;
   if (Object.keys(econ.econs).length > 1) {
     bio += `, supplemented by ${otherKeys(econ.econs, econ.topEcon).join(", ")}`;
   }
@@ -109,15 +109,20 @@ function buildBioText(provinces, econ) {
     bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
       `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
 
+    // From here down, mirrors the BBC code's own "Economy Type" / "World
+    // Exports" fields - map.js recognizes the %%FIELD%% and %%EXPORTS%%
+    // prefixes and renders them as a labeled field and a small table
+    // respectively, instead of plain paragraphs, so the visible page and
+    // the copied BBC code read as the same layout in two formats.
     const classification = econ.classification;
-    bio += `Economic Classification: ${classification.name}` +
-      (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `.\n\n`;
+    bio += `%%FIELD%%Economy Type|${classification.name}` +
+      (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `\n\n`;
     const desc = ECONOMY_DESCRIPTIONS[classification.name];
     if (desc) bio += `${desc}\n\n`;
 
-    const exports = buildWorldExports(classification.name, t).filter(Boolean);
-    if (exports.length > 0) {
-      bio += `Top exports, in order: ${exports.join(", ")}.\n\n`;
+    const exports = buildWorldExports(classification.name, t);
+    if (exports.some(Boolean)) {
+      bio += `%%EXPORTS%%1st:${exports[0]}|2nd:${exports[1]}|3rd:${exports[2]}|4th:${exports[3]}|5th:${exports[4]}\n\n`;
     }
   }
 
@@ -207,7 +212,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
  [i]{{ECON_TYPE}}[/i][list][*]{{ECON_TYPE_DESC}}
 [/list][*][u]World Exports[/u]: 
  [list]| 1[sup]st[/sup] : {{EXPORT_1}} | 2[sup]nd[/sup] : {{EXPORT_2}} | 3[sup]rd[/sup] : {{EXPORT_3}} | 4[sup]th[/sup] : {{EXPORT_4}} | 5[sup]th[/sup] : {{EXPORT_5}} |[/list] 
- [*][i]Please look over the [url=[/url] to understand how your economy fits into the region.[/i][/list] 
+ [*][i]Please look over the [url=https://www.nationstates.net/page=dispatch/id=737839]Economic Guide[/url] to understand how your economy fits into the region.[/i][/list] 
 
 [b]Resources & Production[/b]:
 [list][*][u]Resources[/u]:

@@ -502,6 +502,26 @@
           if(placeholderMatch){
             return '<p class="bio-placeholder">' + escapeHtml(placeholderMatch[1]) + '</p>';
           }
+          // "%%FIELD%%Label|Value" -> a labeled field, matching the BBC
+          // code's "[u]Label[/u]: value" lines (e.g. "Economy Type:").
+          if(para.indexOf('%%FIELD%%') === 0){
+            const parts = para.slice(9).split('|');
+            return '<p class="bio-field"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
+              '<span class="bio-field-value">' + escapeHtml(parts.slice(1).join('|')) + '</span></p>';
+          }
+          // "%%EXPORTS%%1st:X|2nd:Y|3rd:Z|4th:W|5th:V" -> a small ranked
+          // table, matching the BBC code's own World Exports table.
+          if(para.indexOf('%%EXPORTS%%') === 0){
+            const cells = para.slice(11).split('|').map(function(c){
+              const i = c.indexOf(':');
+              return { rank: c.slice(0, i), value: c.slice(i+1) };
+            });
+            var headerRow = cells.map(function(c){ return '<th>' + escapeHtml(c.rank) + '</th>'; }).join('');
+            var dataRow = cells.map(function(c){ return '<td>' + escapeHtml(c.value || '\u2014') + '</td>'; }).join('');
+            return '<div class="bio-field-label">World Exports:</div>' +
+              '<table class="bio-export-table"><thead><tr>' + headerRow + '</tr></thead>' +
+              '<tbody><tr>' + dataRow + '</tr></tbody></table>';
+          }
           return '<p>' + escapeHtml(para).replace(/\n/g, '<br>') + '</p>';
         }).join('\n');
 
@@ -524,6 +544,13 @@
       '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.4px; color:var(--ink); margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line); text-transform:uppercase; }\n' +
       '  .bio-section:first-of-type{ margin-top:18px; }\n' +
       '  .bio-placeholder{ font-family:var(--font-body); font-style:italic; font-size:14px; color:var(--ink-soft); background:rgba(0,0,0,0.03); border:1px dashed var(--line); border-radius:4px; padding:10px 12px; margin:0 0 14px; }\n' +
+      '  .bio-field{ font-family:var(--font-body); font-size:16px; line-height:1.6; color:var(--ink); margin:0 0 4px; }\n' +
+      '  .bio-field-label{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--ink-soft); margin-right:2px; }\n' +
+      '  .bio-field-value{ font-style:italic; font-weight:600; }\n' +
+      '  .bio-export-table{ width:100%; border-collapse:collapse; margin:6px 0 14px; font-family:var(--font-body); font-size:13.5px; }\n' +
+      '  .bio-export-table th{ font-family:var(--font-display); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--ink-soft); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); }\n' +
+      '  .bio-export-table td{ padding:8px 10px; color:var(--ink); border-bottom:1px solid var(--line); vertical-align:top; }\n' +
+      '  .bio-export-table tr:last-child td{ border-bottom:none; }\n' +
       '  .claim-map{ margin-bottom:22px; }\n' +
       '  .claim-map .map-row{ display:flex; gap:12px; flex-wrap:wrap; }\n' +
       '  .claim-map .map-shot{ flex:1 1 260px; min-width:0; background: var(--parchment); border:1px solid var(--line); border-radius:5px; padding:8px; }\n' +
