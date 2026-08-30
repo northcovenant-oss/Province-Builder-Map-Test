@@ -12,7 +12,12 @@
  * redeploys (usually well under a minute).
  *
  * Each claim record looks like:
- *   { id: "1735500000000", name: "Astoria", provinces: ["S9","S12","N4"], dateAdded: "2026-08-29T12:00:00.000Z" }
+ *   { id: "1735500000000", name: "Astoria", provinces: ["S9","S12","N4"], capital: "S9", dateAdded: "2026-08-29T12:00:00.000Z" }
+ *
+ * `capital` is the label of one of the entries in `provinces`, or null if
+ * no capital was set. It's set on the Admin Page by starring a label in
+ * the claim code (e.g. "S9*"), which is the same marker the bio page's
+ * "Claim Code" box and the main map's "Load a Claim Code" use.
  */
 
 (function () {

@@ -92,9 +92,12 @@
     claims.forEach(function(claim){
       const tr = document.createElement('tr');
       const dateStr = claim.dateAdded ? new Date(claim.dateAdded).toLocaleDateString() : '';
+      const provincesText = (claim.provinces||[]).map(function(label){
+        return (claim.capital && label === claim.capital) ? label + ' \u2605' : label;
+      }).join(', ');
       tr.innerHTML =
         '<td>' + escapeHtml(claim.name) + '</td>' +
-        '<td class="provinces-cell">' + escapeHtml((claim.provinces||[]).join(', ')) + '</td>' +
+        '<td class="provinces-cell">' + escapeHtml(provincesText) + '</td>' +
         '<td>' + escapeHtml(dateStr) + '</td>' +
         '<td class="actions-cell">' +
         '<button class="row-btn" data-action="edit">Edit</button>' +
@@ -122,7 +125,9 @@
     if(!claim) return;
     editingId = id;
     claimantNameInput.value = claim.name;
-    adminClaimCodeInput.value = (claim.provinces||[]).join(', ');
+    adminClaimCodeInput.value = (claim.provinces||[]).map(function(label){
+      return (claim.capital && label === claim.capital) ? label + '*' : label;
+    }).join(', ');
     recordBtn.textContent = 'Save Changes';
     cancelEditBtn.hidden = false;
     setMsg('Editing "' + claim.name + '" \u2014 recording will replace this claim.', null);
@@ -158,12 +163,19 @@
     const provinces = [];
     const unknown = [];
     const seen = {};
+    let capital = null;
     tokens.forEach(function(tok){
-      const p = byLabel[tok];
-      if(!p){ unknown.push(tok); return; }
+      // A trailing "*" marks the capital, e.g. "S9*" - this is the same
+      // marker the bio page's "Claim Code" box uses, so a code copied
+      // straight from there pastes in correctly here.
+      const isCapitalTok = tok.charAt(tok.length - 1) === '*';
+      const label = isCapitalTok ? tok.slice(0, -1) : tok;
+      const p = byLabel[label];
+      if(!p){ unknown.push(label); return; }
       if(seen[p.label]) return;
       seen[p.label] = true;
       provinces.push(p.label);
+      if(isCapitalTok) capital = p.label;
     });
 
     if(unknown.length){
@@ -192,6 +204,7 @@
       const claim = claims.find(function(c){ return c.id === editingId; });
       claim.name = name;
       claim.provinces = provinces;
+      claim.capital = capital;
       claim.dateAdded = claim.dateAdded || new Date().toISOString();
       claim.dateUpdated = new Date().toISOString();
     } else {
@@ -199,6 +212,7 @@
         id: String(Date.now()) + '-' + Math.random().toString(36).slice(2,7),
         name: name,
         provinces: provinces,
+        capital: capital,
         dateAdded: new Date().toISOString(),
       });
     }
