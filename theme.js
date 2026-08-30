@@ -19,8 +19,10 @@
   const optionsPanel = document.getElementById('setupOptions');
   const dropdown = document.getElementById('themeDropdown');
   const optionButtons = Array.from(document.querySelectorAll('.theme-option'));
+  const hasDropdownUI = !!(toggleBtn && optionsPanel && dropdown);
 
   function closeDropdown(){
+    if(!hasDropdownUI) return;
     toggleBtn.setAttribute('aria-expanded', 'false');
     optionsPanel.hidden = true;
   }
@@ -65,19 +67,24 @@
     });
   });
 
-  toggleBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-    toggleBtn.setAttribute('aria-expanded', String(!expanded));
-    optionsPanel.hidden = expanded;
-  });
+  // Pages without the Appearance dropdown (e.g. admin.html) still get the
+  // saved theme applied to <body> above; they just skip the UI wiring below,
+  // since there's nothing in the DOM for it to attach to.
+  if (hasDropdownUI) {
+    toggleBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      toggleBtn.setAttribute('aria-expanded', String(!expanded));
+      optionsPanel.hidden = expanded;
+    });
 
-  // Close the dropdown when clicking anywhere outside it.
-  document.addEventListener('click', function(e){
-    if (!dropdown.contains(e.target)) {
-      closeDropdown();
-    }
-  });
+    // Close the dropdown when clicking anywhere outside it.
+    document.addEventListener('click', function(e){
+      if (!dropdown.contains(e.target)) {
+        closeDropdown();
+      }
+    });
+  }
 
   applyTheme(getSavedTheme());
 })();

@@ -93,6 +93,86 @@
   const byLabel = {};
   PROVINCES.forEach(function(p){ byLabel[p.label.toUpperCase()] = p; });
 
+  // ---- Already-claimed provinces (from claims.json via the Admin Page) ----
+  // takenIndex maps a province's uppercase label -> the claim record that
+  // owns it. Loaded async on startup; the map renders normally until this
+  // resolves, then locks whichever provinces turn out to be taken.
+  //
+  // claimsEnabled is a separate on/off switch (the "Existing Claims" toggle
+  // in the top-right corner) for previewing the map as if no claims were
+  // recorded yet, without touching claims.json itself. Defaults to on and
+  // persists per-browser via localStorage, same pattern as the theme choice.
+  const CLAIMS_TOGGLE_KEY = 'landClaimClaimsEnabled';
+  let takenIndex = {};
+  let claimsEnabled = true;
+  try {
+    const saved = localStorage.getItem(CLAIMS_TOGGLE_KEY);
+    if(saved !== null) claimsEnabled = saved === 'true';
+  } catch(e) { /* localStorage unavailable - default stands */ }
+
+  if (window.ClaimsStore) {
+    try {
+      window.ClaimsStore.loadClaims().then(function(claims){
+        takenIndex = window.ClaimsStore.buildProvinceIndex(claims);
+        // Drop anything already taken out of the current in-progress selection
+        // (covers the rare case where someone had a now-claimed province
+        // selected before this finished loading).
+        selected = selected.filter(function(id){
+          const p = byId[id];
+          return !(p && isTaken(p));
+        });
+        applyTakenStyling();
+        render();
+      }).catch(function(e){
+        console.warn('Claims lookup failed, continuing without it:', e.message);
+      });
+    } catch(e) {
+      console.warn('Claims lookup failed, continuing without it:', e.message);
+    }
+  }
+
+  function isTaken(p){
+    return claimsEnabled && !!takenIndex[p.label.toUpperCase()];
+  }
+
+  // Re-applies the "taken" look to every province's element regardless of
+  // which layer is active - knowing land is unavailable matters more than
+  // seeing its econ/climate color while you're trying to claim new land.
+  function applyTakenStyling(){
+    PROVINCES.forEach(function(p){
+      const el = provinceEls[p.id];
+      if(!el) return;
+      el.classList.toggle('taken', isTaken(p));
+    });
+  }
+
+  // ---- Existing Claims toggle ----
+  const claimsToggle = document.getElementById('claimsToggle');
+  const claimsToggleState = document.getElementById('claimsToggleState');
+  if(claimsToggle){
+    updateClaimsToggleUI();
+    claimsToggle.addEventListener('click', function(){
+      claimsEnabled = !claimsEnabled;
+      try { localStorage.setItem(CLAIMS_TOGGLE_KEY, String(claimsEnabled)); } catch(e){ /* non-fatal */ }
+      updateClaimsToggleUI();
+      if(claimsEnabled){
+        // Drop any selections that turn out to conflict with a recorded
+        // claim now that locking is back on.
+        selected = selected.filter(function(id){
+          const p = byId[id];
+          return !(p && isTaken(p));
+        });
+      }
+      applyTakenStyling();
+      render();
+    });
+  }
+  function updateClaimsToggleUI(){
+    if(!claimsToggle) return;
+    claimsToggle.setAttribute('aria-pressed', String(claimsEnabled));
+    claimsToggleState.textContent = claimsEnabled ? 'On' : 'Off';
+  }
+
   // ---- Layer tab bar ----
   const layerTabs = document.getElementById('layerTabs');
   const noDataBanner = document.getElementById('noDataBanner');
@@ -120,6 +200,7 @@
       else { fill = 'url(#noDataHatch)'; }
       el.setAttribute('fill', fill);
     });
+    applyTakenStyling();
     noDataBanner.classList.toggle('show', layer.type === 'placeholder');
     if(layer.type === 'placeholder'){
       noDataBanner.textContent = 'No ' + layer.label.toLowerCase() + ' data yet \u2014 this layer is a placeholder. Provinces are still selectable.';
@@ -155,7 +236,9 @@
   function showTooltip(e, p){
     const rect = mapFrame.getBoundingClientRect();
     let sub;
-    if(activeLayer.id === 'economic'){
+    if(isTaken(p)){
+      sub = 'Claimed by ' + takenIndex[p.label.toUpperCase()].name;
+    } else if(activeLayer.id === 'economic'){
       sub = p.econ;
     } else if(activeLayer.id === 'climate'){
       if(p.climate){
@@ -182,6 +265,8 @@
   }
 
   function toggleProvince(id){
+    const p = byId[id];
+    if(p && isTaken(p)) return; // already claimed by someone else - not selectable
     const idx = selected.indexOf(id);
     if(idx !== -1){
       selected.splice(idx, 1);
@@ -272,10 +357,12 @@
     }
     const found = [];
     const unknown = [];
+    const taken = [];
     const seen = {};
     tokens.forEach(function(tok){
       const p = byLabel[tok];
       if(!p){ unknown.push(tok); return; }
+      if(isTaken(p)){ taken.push(tok); return; }
       if(seen[p.id]) return; // skip duplicates
       seen[p.id] = true;
       found.push(p.id);
@@ -288,6 +375,7 @@
     const parts = [];
     parts.push(selected.length + ' province' + (selected.length === 1 ? '' : 's') + ' loaded.');
     if(truncated) parts.push('Only the first ' + MAX_SELECT + ' were used.');
+    if(taken.length) parts.push('Already claimed by someone else: ' + taken.join(', ') + '.');
     if(unknown.length) parts.push('Not found: ' + unknown.join(', ') + '.');
     setClaimMsg(parts.join(' '), unknown.length > 0);
   }
@@ -378,7 +466,7 @@
 
     const mapHtml = loading ? '' : buildClaimMapHtml(provinces);
 
-    const html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n' +
+    const html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
       '<title>Land Bio' + (provinces.length ? ' \u2014 ' + escapeHtml(provinces[0].label) + (provinces.length > 1 ? ' +' + (provinces.length - 1) : '') : '') + '</title>\n' +
       '<link rel="stylesheet" href="style.css">\n' +
       '<style>\n' +
@@ -386,6 +474,10 @@
       '  .bio-card{ max-width:680px; margin:0 auto; background: var(--panel-bg); border:1px solid var(--line); border-radius:6px; padding:36px 40px; box-shadow:0 8px 28px rgba(0,0,0,0.2); }\n' +
       '  .bio-card h1{ font-family:var(--font-display); color:var(--ink); margin:0 0 4px; font-size:24px; }\n' +
       '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
+      '  .nation-field{ margin-bottom:22px; }\n' +
+      '  .nation-field label{ display:block; font-family:var(--font-display); font-size:12px; letter-spacing:0.4px; color:var(--ink-soft); margin-bottom:6px; }\n' +
+      '  .nation-field input{ width:100%; box-sizing:border-box; font-family:var(--font-body); font-size:14px; padding:9px 12px; border:1px solid var(--line); border-radius:4px; background:rgba(255,255,255,0.4); color:var(--ink); }\n' +
+      '  .nation-field input:focus{ outline:none; border-color:var(--gold); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
       '  .claim-map{ margin-bottom:22px; }\n' +
@@ -402,11 +494,21 @@
       '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
       '  .copy-btn.copied{ background:var(--gold); }\n' +
       '  #bbcSource{ position:absolute; left:-9999px; top:-9999px; }\n' +
+      '  @media (max-width:480px){\n' +
+      '    body.bio-page{ padding:20px 12px; }\n' +
+      '    .bio-card{ padding:22px 18px; }\n' +
+      '    .bio-card h1{ font-size:20px; }\n' +
+      '    .claim-map .map-row{ flex-direction:column; }\n' +
+      '  }\n' +
       '</style>\n</head>\n' +
       '<body class="bio-page ' + themeClass + '">\n' +
       '  <div class="bio-card">\n' +
       '    <h1>Land Bio</h1>\n' +
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
+      (loading ? '' : '    <div class="nation-field">\n' +
+        '      <label for="nationName">NationStates Nation</label>\n' +
+        '      <input type="text" id="nationName" placeholder="e.g. Astoria" autocomplete="off">\n' +
+        '    </div>\n') +
       mapHtml +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
       (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
@@ -418,6 +520,16 @@
       '    </div>\n' +
       '  </div>\n' +
       '  <script>\n' +
+      '    var nationInput = document.getElementById("nationName");\n' +
+      '    if(nationInput){\n' +
+      '      try {\n' +
+      '        var savedName = localStorage.getItem("landClaimNationName");\n' +
+      '        if(savedName) nationInput.value = savedName;\n' +
+      '      } catch(e){}\n' +
+      '      nationInput.addEventListener("input", function(){\n' +
+      '        try { localStorage.setItem("landClaimNationName", nationInput.value); } catch(e){}\n' +
+      '      });\n' +
+      '    }\n' +
       '    function bindCopyButton(btnId, getText, label){\n' +
       '      var btn = document.getElementById(btnId);\n' +
       '      if(!btn) return;\n' +
@@ -441,7 +553,12 @@
       '      });\n' +
       '    }\n' +
       '    bindCopyButton("copyClaimBtn", function(){ return document.getElementById("claimCodeValue").textContent; }, "Copy Claim Code");\n' +
-      '    bindCopyButton("copyBbcBtn", function(){ return document.getElementById("bbcSource").value; }, "Copy BBC Code");\n' +
+      '    bindCopyButton("copyBbcBtn", function(){\n' +
+      '      var raw = document.getElementById("bbcSource").value;\n' +
+      '      var name = nationInput ? nationInput.value.trim() : "";\n' +
+      '      if(name){ raw = raw.replace("[nation][/nation]", "[nation]" + name + "[/nation]"); }\n' +
+      '      return raw;\n' +
+      '    }, "Copy BBC Code");\n' +
       '  <\/script>\n' +
       '</body>\n</html>';
 
@@ -552,15 +669,18 @@
     const claimedSet = {};
     claimedIds.forEach(function(id){ claimedSet[id]=true; });
 
+    // Blank "Provinces" look for every shape (same neutral fill claimed or
+    // not) - claimed provinces are distinguished only by the gold outline,
+    // matching how selection reads on the live map's Provinces tab.
+    const neutralFill = getNeutralFill();
     let paths = '';
     PROVINCES.forEach(function(p){
       if(p.continent !== continentName) return;
       const isClaimed = !!claimedSet[p.id];
-      const fill = isClaimed ? p.fill : '#c9b98c';
       const strokeCls = isClaimed
         ? 'stroke="#e0a83e" stroke-width="1.6"'
         : 'stroke="#2c2417" stroke-width="0.5"';
-      paths += `<path d="${p.d}" fill="${fill}" ${strokeCls}/>`;
+      paths += `<path d="${p.d}" fill="${neutralFill}" ${strokeCls}/>`;
     });
 
     return `<svg viewBox="${bb.minX-pad} ${bb.minY-pad} ${w} ${h}" xmlns="http://www.w3.org/2000/svg">` +
@@ -660,11 +780,85 @@
     svg.classList.remove('panning');
   });
 
-  // suppress click-to-select if the mousedown/up was actually a drag
+  // ---- touch support (one finger pans, two fingers pinch-zoom) ----
+  // Mirrors the mouse pan/zoom logic above. Simple taps still work for
+  // province selection without any extra code here, since a touch that
+  // never moves still lets the browser's normal synthesized "click" fire.
+  let touchMode = null; // 'pan' | 'pinch' | null
+  let touchMoved = false;
+  let touchLastX = 0, touchLastY = 0;
+  let pinchStartDist = 0, pinchStartVb = null;
+
+  function touchDist(touches){
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+  function touchMidpoint(touches){
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }
+
+  svg.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){
+      touchMode = 'pan';
+      touchMoved = false;
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    } else if(e.touches.length === 2){
+      touchMode = 'pinch';
+      touchMoved = true; // a pinch is never a tap-to-select
+      pinchStartDist = touchDist(e.touches);
+      pinchStartVb = vb.slice();
+    }
+  }, { passive: true });
+
+  svg.addEventListener('touchmove', function(e){
+    if(touchMode === 'pan' && e.touches.length === 1){
+      const t = e.touches[0];
+      const dx = t.clientX - touchLastX;
+      const dy = t.clientY - touchLastY;
+      if(Math.abs(dx) > 2 || Math.abs(dy) > 2) touchMoved = true;
+      if(!touchMoved) return;
+      e.preventDefault();
+      const rect = mapFrame.getBoundingClientRect();
+      vb[0] -= dx * (vb[2] / rect.width);
+      vb[1] -= dy * (vb[3] / rect.height);
+      touchLastX = t.clientX;
+      touchLastY = t.clientY;
+      applyViewBox();
+      hideTooltip();
+    } else if(touchMode === 'pinch' && e.touches.length === 2){
+      e.preventDefault();
+      const dist = touchDist(e.touches);
+      const mid = touchMidpoint(e.touches);
+      // Recompute from the pinch's starting viewBox each move (rather than
+      // compounding factors frame to frame) so there's no drift.
+      vb = pinchStartVb.slice();
+      zoomAt(mid.x, mid.y, pinchStartDist / dist);
+    }
+  }, { passive: false });
+
+  svg.addEventListener('touchend', function(e){
+    if(e.touches.length === 0){
+      touchMode = null;
+    } else if(e.touches.length === 1){
+      // lifted one finger out of a pinch - resume as a pan with the other
+      touchMode = 'pan';
+      touchMoved = true; // already a multi-touch gesture, not a tap
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    }
+  });
+
+  // suppress click-to-select if the mousedown/up (or touch) was actually a drag
   svg.addEventListener('click', function(e){
-    if(dragMoved){
+    if(dragMoved || touchMoved){
       e.stopPropagation();
       e.preventDefault();
+      touchMoved = false;
     }
   }, true);
 

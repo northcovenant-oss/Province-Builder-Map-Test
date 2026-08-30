@@ -2,31 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Claim Your Lands</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="app">
-  <div class="theme-dropdown" id="themeDropdown">
-    <button class="theme-dropdown-toggle" id="setupToggle" aria-expanded="false">
-      <span class="theme-toggle-icon">&#9679;&#9679;&#9679;</span>
-      <span>Appearance</span>
-      <span class="chevron" id="setupChevron">&#9662;</span>
+  <div class="site-controls">
+    <button class="claims-toggle" id="claimsToggle" aria-pressed="true" title="When on, provinces already recorded in claims.json are locked and unselectable.">
+      <span class="claims-toggle-switch"></span>
+      <span class="claims-toggle-label">Existing Claims: <strong id="claimsToggleState">On</strong></span>
     </button>
-    <div class="theme-dropdown-panel" id="setupOptions" hidden>
-      <button class="theme-option" data-theme="parchment">
-        <span class="theme-swatch swatch-parchment"></span>
-        <span class="theme-name">Parchment<br><small>Classic map style</small></span>
+
+    <div class="theme-dropdown" id="themeDropdown">
+      <button class="theme-dropdown-toggle" id="setupToggle" aria-expanded="false">
+        <span class="theme-toggle-icon">&#9679;&#9679;&#9679;</span>
+        <span>Appearance</span>
+        <span class="chevron" id="setupChevron">&#9662;</span>
       </button>
-      <button class="theme-option" data-theme="modern">
-        <span class="theme-swatch swatch-modern"></span>
-        <span class="theme-name">Modern<br><small>White continents, blue ocean</small></span>
-      </button>
-      <button class="theme-option" data-theme="dark">
-        <span class="theme-swatch swatch-dark"></span>
-        <span class="theme-name">Dark Mode<br><small>Low-light friendly</small></span>
-      </button>
+      <div class="theme-dropdown-panel" id="setupOptions" hidden>
+        <button class="theme-option" data-theme="modern">
+          <span class="theme-swatch swatch-modern"></span>
+          <span class="theme-name">Modern<br><small>White continents, blue ocean</small></span>
+        </button>
+        <button class="theme-option" data-theme="parchment">
+          <span class="theme-swatch swatch-parchment"></span>
+          <span class="theme-name">Parchment<br><small>Classic map style</small></span>
+        </button>
+        <button class="theme-option" data-theme="dark">
+          <span class="theme-swatch swatch-dark"></span>
+          <span class="theme-name">Dark Mode<br><small>Low-light friendly</small></span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -82,6 +90,7 @@
 
 
 <script src="data.js"></script>
+<script src="claims.js"></script>
 <script src="landbio.js"></script>
 <script src="map.js"></script>
 <script src="theme.js"></script>

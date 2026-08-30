@@ -106,6 +106,7 @@ html,body{
   height:100%;
   display:block;
   cursor: default;
+  touch-action: none;
 }
 
 .title-block{
@@ -266,6 +267,17 @@ path.province.selected{
   stroke-width: 1.6;
   filter: saturate(1.3) brightness(1.05);
 }
+path.province.taken{
+  fill: #8a8578 !important;
+  stroke: rgba(44,36,23,0.5);
+  stroke-width: 0.5;
+  cursor: not-allowed;
+  opacity: 0.6;
+  filter: none !important;
+}
+path.province.taken:hover{
+  filter: none !important;
+}
 path.water{
   fill: var(--water);
   stroke: rgba(44,36,23,0.25);
@@ -344,11 +356,63 @@ path.extra-island{
   line-height:1.4;
 }
 
-.theme-dropdown{
+.site-controls{
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-body);
+}
+
+.claims-toggle{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 9px 14px;
+  cursor:pointer;
+  font-family: var(--font-display);
+  font-size:12.5px;
+  letter-spacing:0.3px;
+  color: var(--ink);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  white-space: nowrap;
+}
+.claims-toggle-switch{
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.claims-toggle-switch::after{
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.claims-toggle[aria-pressed="true"] .claims-toggle-switch{
+  background: var(--gold);
+}
+.claims-toggle[aria-pressed="true"] .claims-toggle-switch::after{
+  transform: translateX(13px);
+}
+
+.theme-dropdown{
+  position: relative;
   font-family: var(--font-body);
 }
 .theme-dropdown-toggle{
@@ -629,7 +693,56 @@ button.btn-load:hover{ background: rgba(0,0,0,0.05); }
 .claim-code-msg.warning{ color: var(--seal-red); }
 
 @media (max-width: 820px){
-  .app{ flex-direction:column-reverse; }
-  .panel{ flex-basis:auto; height:42vh; border-left:none; border-top:2px solid var(--ink); }
-  .map-wrap{ height:58vh; padding:14px; }
+  html,body{ height: 100vh; height: 100dvh; }
+
+  .app{ flex-direction:column; height:100vh; height:100dvh; }
+  .map-wrap{ height:56vh; height:56dvh; padding:10px; }
+  .panel{ flex-basis:auto; height:44vh; height:44dvh; border-left:none; border-top:2px solid var(--ink); padding-top:96px; overflow-y:auto; }
+
+  /* Site-wide controls (Appearance + Existing Claims) stack instead of
+     sitting side by side, since together they're wider than most phones. */
+  .site-controls{ flex-direction:column; align-items:flex-end; top:10px; right:10px; gap:6px; }
+  .claims-toggle, .theme-dropdown-toggle{ padding:7px 11px; font-size:11.5px; }
+  .theme-dropdown-panel{ width: min(230px, calc(100vw - 32px)); }
+
+  /* Title and layer tabs would otherwise overlap on a narrow map frame -
+     stack the tabs into their own row below the title instead. */
+  .title-block{ top:8px; left:8px; padding:7px 12px 8px 3px; max-width: calc(100% - 16px); }
+  .title-block h1{ font-size:16px; letter-spacing:0.8px; }
+  .title-block p{ font-size:11.5px; margin-top:2px; }
+
+  .layer-tabs{
+    top:auto;
+    bottom:8px;
+    left:8px;
+    right:8px;
+    justify-content:flex-start;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .layer-tabs::-webkit-scrollbar{ display:none; }
+  .layer-tab{ font-size:11px; padding:8px 10px; flex:0 0 auto; }
+
+  .no-data-banner{ top:8px; right:8px; max-width: calc(100% - 16px); font-size:11.5px; }
+
+  /* Zoom controls and legend move up off the bottom edge since the layer
+     tab strip now lives there instead. */
+  .zoom-controls{ bottom:56px; left:8px; }
+  .zoom-btn{ width:36px; height:36px; font-size:17px; }
+  .legend{ bottom:56px; right:8px; max-width: min(190px, calc(100vw - 90px)); font-size:11.5px; padding:8px 10px; }
+  .legend-row{ font-size:11.5px; }
+
+  /* Bigger tap targets throughout the side panel. */
+  button.btn, button.btn-load, .claim-code-input, .claims-toggle{ min-height:40px; }
+  .panel-actions button{ padding:12px 14px; }
+}
+
+@media (max-width: 420px){
+  .title-block{ max-width:130px; }
+  .title-block h1{ font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .title-block p{ display:none; } /* subtitle gets tight on very small phones - title alone is enough */
+  .layer-tab{ font-size:10.5px; padding:7px 9px; }
+  .site-controls .claims-toggle-label small,
+  .claims-toggle-label{ font-size:11px; }
 }
