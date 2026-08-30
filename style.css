@@ -310,6 +310,11 @@ path.extra-island{
   text-anchor:middle;
   dominant-baseline:central;
 }
+.seal-capital circle{
+  fill: var(--gold);
+  stroke: var(--parchment);
+  stroke-width: 0.6;
+}
 
 .tooltip{
   position:absolute;
@@ -545,6 +550,10 @@ path.extra-island{
   border-radius:3px;
   animation: itemIn 0.18s ease;
 }
+.item-capital{
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, rgba(255,255,255,0.35));
+}
 @keyframes itemIn{
   from{ opacity:0; transform: translateX(6px); }
   to{ opacity:1; transform: translateX(0); }
@@ -573,6 +582,30 @@ path.extra-island{
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.capital-badge{
+  font-family: var(--font-display);
+  font-size:10px;
+  letter-spacing:0.3px;
+  color: var(--ink);
+  background: var(--gold);
+  border-radius:3px;
+  padding:1px 6px;
+  margin-left:6px;
+  vertical-align:middle;
+}
+.item .capital-star{
+  background:none;
+  border:none;
+  color: var(--ink-soft);
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+  padding:2px 4px;
+  opacity:0.55;
+  flex-shrink:0;
+}
+.item .capital-star:hover{ opacity:1; color: var(--gold); }
+.item .capital-star.active{ opacity:1; color: var(--gold); }
 .item .remove{
   background:none;
   border:none;
@@ -582,6 +615,7 @@ path.extra-island{
   line-height:1;
   padding:2px 4px;
   opacity:0.6;
+  flex-shrink:0;
 }
 .item .remove:hover{ opacity:1; color:var(--seal-red); }
 

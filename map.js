@@ -264,12 +264,15 @@
     setTimeout(function(){ limitMsg.classList.remove('show'); }, 1600);
   }
 
+  let capitalId = null;
+
   function toggleProvince(id){
     const p = byId[id];
     if(p && isTaken(p)) return; // already claimed by someone else - not selectable
     const idx = selected.indexOf(id);
     if(idx !== -1){
       selected.splice(idx, 1);
+      if(capitalId === id) capitalId = null;
     } else {
       if(selected.length >= MAX_SELECT){
         flashLimit();
@@ -282,7 +285,16 @@
 
   function removeProvince(id){
     const idx = selected.indexOf(id);
-    if(idx !== -1){ selected.splice(idx,1); render(); }
+    if(idx !== -1){
+      selected.splice(idx,1);
+      if(capitalId === id) capitalId = null;
+      render();
+    }
+  }
+
+  function toggleCapital(id){
+    capitalId = (capitalId === id) ? null : id;
+    render();
   }
 
   function render(){
@@ -291,22 +303,23 @@
       provinceEls[id].classList.toggle('selected', selected.indexOf(id) !== -1);
     });
 
-    // seals (order badges) - remove old, redraw
+    // seals (order badges, or a star for the capital) - remove old, redraw
     Array.from(g.querySelectorAll('.seal')).forEach(function(n){ n.remove(); });
     Array.from(gSouth.querySelectorAll('.seal')).forEach(function(n){ n.remove(); });
     selected.forEach(function(id, i){
       const p = byId[id];
       const c = centroid(p.d);
       if(!c) return;
+      const isCapital = id === capitalId;
       const seal = document.createElementNS(NS, 'g');
-      seal.setAttribute('class', 'seal');
-      const r = 5.2;
+      seal.setAttribute('class', 'seal' + (isCapital ? ' seal-capital' : ''));
+      const r = isCapital ? 6.4 : 5.2;
       const circle = document.createElementNS(NS, 'circle');
       circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', r);
       const text = document.createElementNS(NS, 'text');
       text.setAttribute('x', c.x); text.setAttribute('y', c.y);
-      text.setAttribute('font-size', '6.5');
-      text.textContent = (i+1);
+      text.setAttribute('font-size', isCapital ? '7.5' : '6.5');
+      text.textContent = isCapital ? '\u2605' : (i+1);
       seal.appendChild(circle);
       seal.appendChild(text);
       groupFor(p).appendChild(seal);
@@ -322,13 +335,16 @@
     } else {
       selected.forEach(function(id, i){
         const p = byId[id];
+        const isCapital = id === capitalId;
         const item = document.createElement('div');
-        item.className = 'item';
+        item.className = 'item' + (isCapital ? ' item-capital' : '');
         item.innerHTML =
           '<div class="order">'+(i+1)+'</div>' +
           '<div class="swatch" style="background:'+p.fill+'"></div>' +
-          '<div class="name">'+p.label+'</div>' +
+          '<div class="name">'+p.label+(isCapital ? ' <span class="capital-badge">Capital</span>' : '')+'</div>' +
+          '<button class="capital-star'+(isCapital ? ' active' : '')+'" title="'+(isCapital ? 'Unset as capital' : 'Set as capital')+'">'+(isCapital ? '\u2605' : '\u2606')+'</button>' +
           '<button class="remove" title="Release province">\u2715</button>';
+        item.querySelector('.capital-star').addEventListener('click', function(){ toggleCapital(id); });
         item.querySelector('.remove').addEventListener('click', function(){ removeProvince(id); });
         selectedList.appendChild(item);
       });
@@ -339,6 +355,7 @@
 
   clearBtn.addEventListener('click', function(){
     selected = [];
+    capitalId = null;
     render();
   });
 
@@ -359,22 +376,29 @@
     const unknown = [];
     const taken = [];
     const seen = {};
+    let loadedCapitalId = null;
     tokens.forEach(function(tok){
-      const p = byLabel[tok];
-      if(!p){ unknown.push(tok); return; }
-      if(isTaken(p)){ taken.push(tok); return; }
+      // A trailing "*" marks the capital, e.g. "S9*" - strip it before lookup.
+      const isCapitalTok = tok.charAt(tok.length - 1) === '*';
+      const label = isCapitalTok ? tok.slice(0, -1) : tok;
+      const p = byLabel[label];
+      if(!p){ unknown.push(label); return; }
+      if(isTaken(p)){ taken.push(label); return; }
       if(seen[p.id]) return; // skip duplicates
       seen[p.id] = true;
       found.push(p.id);
+      if(isCapitalTok) loadedCapitalId = p.id;
     });
 
     const truncated = found.length > MAX_SELECT;
     selected = found.slice(0, MAX_SELECT);
+    capitalId = (loadedCapitalId && selected.indexOf(loadedCapitalId) !== -1) ? loadedCapitalId : null;
     render();
 
     const parts = [];
     parts.push(selected.length + ' province' + (selected.length === 1 ? '' : 's') + ' loaded.');
     if(truncated) parts.push('Only the first ' + MAX_SELECT + ' were used.');
+    if(capitalId) parts.push(byId[capitalId].label + ' set as capital.');
     if(taken.length) parts.push('Already claimed by someone else: ' + taken.join(', ') + '.');
     if(unknown.length) parts.push('Not found: ' + unknown.join(', ') + '.');
     setClaimMsg(parts.join(' '), unknown.length > 0);
@@ -421,8 +445,13 @@
     // The actual bio-writing logic lives in landbio.js so it can be edited
     // independently of the map. It receives the full province objects
     // (with id, label, econ, climate, fill, etc.) for everything claimed,
-    // in the order they were claimed.
-    const claimedProvinces = selected.map(function(id){ return byId[id]; });
+    // in the order they were claimed. Each is a shallow copy (never mutate
+    // the shared byId/PROVINCES objects) with isCapital set so landbio.js
+    // and the bio page both know which one, if any, is the capital.
+    const claimedProvinces = selected.map(function(id){
+      const p = byId[id];
+      return Object.assign({}, p, { isCapital: id === capitalId });
+    });
 
     // Open the tab synchronously, in direct response to the click, so
     // browsers don't treat it as a popup and block it. We fill it in
@@ -455,8 +484,10 @@
 
   function writeBioPage(targetWindow, provinces, result, loading){
     const themeClass = Array.from(document.body.classList).find(function(c){ return c.indexOf('theme-') === 0; }) || '';
-    const provinceList = provinces.map(function(p){ return p.label; }).join(', ');
-    const claimCode = provinces.map(function(p){ return p.label; }).join(', ');
+    const provinceList = provinces.map(function(p){ return p.label + (p.isCapital ? ' \u2605' : ''); }).join(', ');
+    // A trailing "*" marks the capital in the claim code, e.g. "S9*, S12, N4" -
+    // "Load a Claim Code" on the main map knows to parse it back out.
+    const claimCode = provinces.map(function(p){ return p.label + (p.isCapital ? '*' : ''); }).join(', ');
     const bbcCode = (result && result.bbcCode) || '';
     const bodyHtml = loading
       ? '<p class="bio-loading">Writing your land bio&hellip;</p>'

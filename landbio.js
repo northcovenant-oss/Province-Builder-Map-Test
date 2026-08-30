@@ -18,7 +18,10 @@
  *     climate: {
  *       dominant: "Oceanic",
  *       breakdown: { "Oceanic": 87.4, "Semi-Arid": 12.6 }
- *     }
+ *     },
+ *     isCapital: false           // true for at most one province - set on
+ *                                 // the map by clicking the star next to a
+ *                                 // claimed province in the sidebar list
  *   }
  *
  * generateLandBio returns (or resolves to, if you make it async — see the
@@ -68,12 +71,14 @@ function computeEconomics(provinces) {
 
 function buildBioText(provinces, econ) {
   const provinceList = provinces.map(p => p.label).join(", ");
+  const capital = provinces.find(p => p.isCapital);
 
   let bio = "";
   bio += `This territory spans ${provinces.length} province${provinces.length === 1 ? "" : "s"} `;
   bio += econ.continents.length > 1
-    ? `across both the northern and southern continents.\n\n`
-    : `on the ${econ.continents[0]} continent.\n\n`;
+    ? `across both the northern and southern continents.`
+    : `on the ${econ.continents[0]} continent.`;
+  bio += capital ? ` Its capital is ${capital.label}.\n\n` : `\n\n`;
 
   bio += buildClimateParagraphs(provinces, econ);
 
