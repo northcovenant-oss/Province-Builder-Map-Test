@@ -724,8 +724,12 @@
   // ---- Zoom & Pan ----
   const BASE_VB = VIEWBOX.split(' ').map(Number); // [x, y, w, h]
   let vb = BASE_VB.slice();
-  const MIN_SCALE = 0.35; // how far in (smaller w/h = more zoomed in)
-  const MAX_SCALE = 6;    // how far out relative to base
+  const MIN_SCALE = 0.35; // lowest magnification allowed - how far OUT you can zoom
+  const MAX_SCALE = 60;   // highest magnification allowed - how far IN you can zoom.
+                          // Raised from 6 so individual small provinces (and the
+                          // tiny islet clusters) are actually easy to target -
+                          // at 6, max zoom-in still showed almost an entire
+                          // continent at once.
 
   function applyViewBox(){
     svg.setAttribute('viewBox', vb.join(' '));
@@ -900,11 +904,11 @@
 
   document.getElementById('zoomIn').addEventListener('click', function(){
     const rect = mapFrame.getBoundingClientRect();
-    zoomAt(rect.left + rect.width/2, rect.top + rect.height/2, 0.75);
+    zoomAt(rect.left + rect.width/2, rect.top + rect.height/2, 0.65);
   });
   document.getElementById('zoomOut').addEventListener('click', function(){
     const rect = mapFrame.getBoundingClientRect();
-    zoomAt(rect.left + rect.width/2, rect.top + rect.height/2, 1/0.75);
+    zoomAt(rect.left + rect.width/2, rect.top + rect.height/2, 1/0.65);
   });
   document.getElementById('zoomReset').addEventListener('click', resetView);
 
