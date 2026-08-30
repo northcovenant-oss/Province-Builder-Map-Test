@@ -509,16 +509,19 @@
             return '<p class="bio-field"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
               '<span class="bio-field-value">' + escapeHtml(parts.slice(1).join('|')) + '</span></p>';
           }
-          // "%%EXPORTS%%1st:X|2nd:Y|3rd:Z|4th:W|5th:V" -> a small ranked
-          // table, matching the BBC code's own World Exports table.
-          if(para.indexOf('%%EXPORTS%%') === 0){
-            const cells = para.slice(11).split('|').map(function(c){
+          // "%%TABLE%%Heading|Label1:Val1|Label2:Val2|..." -> a labeled
+          // small table (any number of columns), matching the BBC code's
+          // own tables (World Exports, the sector percentage row).
+          if(para.indexOf('%%TABLE%%') === 0){
+            const segments = para.slice(10).split('|');
+            const heading = segments[0];
+            const cells = segments.slice(1).map(function(c){
               const i = c.indexOf(':');
-              return { rank: c.slice(0, i), value: c.slice(i+1) };
+              return { label: c.slice(0, i), value: c.slice(i+1) };
             });
-            var headerRow = cells.map(function(c){ return '<th>' + escapeHtml(c.rank) + '</th>'; }).join('');
+            var headerRow = cells.map(function(c){ return '<th>' + escapeHtml(c.label) + '</th>'; }).join('');
             var dataRow = cells.map(function(c){ return '<td>' + escapeHtml(c.value || '\u2014') + '</td>'; }).join('');
-            return '<div class="bio-field-label">World Exports:</div>' +
+            return '<div class="bio-field-label">' + escapeHtml(heading) + ':</div>' +
               '<table class="bio-export-table"><thead><tr>' + headerRow + '</tr></thead>' +
               '<tbody><tr>' + dataRow + '</tr></tbody></table>';
           }

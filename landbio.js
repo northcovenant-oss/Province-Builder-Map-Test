@@ -99,21 +99,17 @@ function buildBioText(provinces, econ) {
   bio += buildClimateParagraphs(provinces, econ);
 
   bio += `## Economy\n\n`;
-  bio += `The regional economy leans toward ${econ.topEcon}`;
-  if (Object.keys(econ.econs).length > 1) {
-    bio += `, supplemented by ${otherKeys(econ.econs, econ.topEcon).join(", ")}`;
-  }
-  bio += `.\n\n`;
   if (econ.sectorTotals) {
     const t = econ.sectorTotals;
-    bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
-      `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
 
     // From here down, mirrors the BBC code's own "Economy Type" / "World
-    // Exports" fields - map.js recognizes the %%FIELD%% and %%EXPORTS%%
+    // Exports" fields - map.js recognizes the %%FIELD%% and %%TABLE%%
     // prefixes and renders them as a labeled field and a small table
     // respectively, instead of plain paragraphs, so the visible page and
     // the copied BBC code read as the same layout in two formats.
+    bio += `%%TABLE%%Sector Breakdown|Services:${t.Services}%|Light Industry:${t.LightIndustry}%|` +
+      `Heavy Industry:${t.HeavyIndustry}%|Extraction:${t.Extraction}%\n\n`;
+
     const classification = econ.classification;
     bio += `%%FIELD%%Economy Type|${classification.name}` +
       (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `\n\n`;
@@ -122,7 +118,7 @@ function buildBioText(provinces, econ) {
 
     const exports = buildWorldExports(classification.name, t);
     if (exports.some(Boolean)) {
-      bio += `%%EXPORTS%%1st:${exports[0]}|2nd:${exports[1]}|3rd:${exports[2]}|4th:${exports[3]}|5th:${exports[4]}\n\n`;
+      bio += `%%TABLE%%World Exports|1st:${exports[0]}|2nd:${exports[1]}|3rd:${exports[2]}|4th:${exports[3]}|5th:${exports[4]}\n\n`;
     }
   }
 
