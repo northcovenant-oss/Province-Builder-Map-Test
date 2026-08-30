@@ -203,7 +203,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 
 [list][b]Climate[/b]: {{CLIMATE_BLOCK}}[/list]
 
-[b]Economy[/b][list]| {{PRIMARY_PCT}}% | {{SECONDARY_PCT}}% | {{TERTIARY_PCT}}% |
+[b]Economy[/b][list]| Primary: {{PRIMARY_PCT}}% | Secondary: {{SECONDARY_PCT}}% | Tertiary: {{TERTIARY_PCT}}% |
 [*][u]Economy Type[/u]: 
  [i]{{ECON_TYPE}}[/i][list][*]{{ECON_TYPE_DESC}}
 [/list][*][u]World Exports[/u]: 
