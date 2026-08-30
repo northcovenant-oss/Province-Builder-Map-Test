@@ -492,6 +492,16 @@
     const bodyHtml = loading
       ? '<p class="bio-loading">Writing your land bio&hellip;</p>'
       : result.text.split(/\n\n+/).map(function(para){
+          // "## Heading" -> section heading, matching the BBC code's own
+          // [b]Section[/b] labels so the two read as the same document.
+          if(para.indexOf('## ') === 0){
+            return '<h2 class="bio-section">' + escapeHtml(para.slice(3)) + '</h2>';
+          }
+          // "*(placeholder note)*" -> a visually distinct not-filled-in-yet note.
+          const placeholderMatch = para.match(/^\*\((.*)\)\*$/);
+          if(placeholderMatch){
+            return '<p class="bio-placeholder">' + escapeHtml(placeholderMatch[1]) + '</p>';
+          }
           return '<p>' + escapeHtml(para).replace(/\n/g, '<br>') + '</p>';
         }).join('\n');
 
@@ -511,6 +521,9 @@
       '  .nation-field input:focus{ outline:none; border-color:var(--gold); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
+      '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.4px; color:var(--ink); margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line); text-transform:uppercase; }\n' +
+      '  .bio-section:first-of-type{ margin-top:18px; }\n' +
+      '  .bio-placeholder{ font-family:var(--font-body); font-style:italic; font-size:14px; color:var(--ink-soft); background:rgba(0,0,0,0.03); border:1px dashed var(--line); border-radius:4px; padding:10px 12px; margin:0 0 14px; }\n' +
       '  .claim-map{ margin-bottom:22px; }\n' +
       '  .claim-map .map-row{ display:flex; gap:12px; flex-wrap:wrap; }\n' +
       '  .claim-map .map-shot{ flex:1 1 260px; min-width:0; background: var(--parchment); border:1px solid var(--line); border-radius:5px; padding:8px; }\n' +

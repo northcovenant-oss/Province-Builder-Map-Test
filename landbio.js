@@ -69,6 +69,13 @@ function computeEconomics(provinces) {
   return { continents, climates, econs, topClimate, topEcon, sectorTotals };
 }
 
+// Section headers in the returned text are marked with a leading "## " -
+// map.js looks for that prefix and renders those lines as headings instead
+// of paragraphs. The section names themselves (Climate, Economy, Resources
+// & Production, Stable Population) intentionally match the BBC template's
+// [b]Section[/b] headers one-for-one, so the on-page bio and the copied
+// BBC code read as the same document in two formats rather than two
+// different pieces of writing.
 function buildBioText(provinces, econ) {
   const provinceList = provinces.map(p => p.label).join(", ");
   const capital = provinces.find(p => p.isCapital);
@@ -80,20 +87,26 @@ function buildBioText(provinces, econ) {
     : `on the ${econ.continents[0]} continent.`;
   bio += capital ? ` Its capital is ${capital.label}.\n\n` : `\n\n`;
 
+  bio += `## Climate\n\n`;
   bio += buildClimateParagraphs(provinces, econ);
 
-  bio += `Economically, the region leans toward ${econ.topEcon.toLowerCase()}`;
+  bio += `## Economy\n\n`;
+  bio += `Economy Type: ${econ.topEcon}`;
   if (Object.keys(econ.econs).length > 1) {
-    bio += `, supplemented by ${otherKeys(econ.econs, econ.topEcon).map(e => e.toLowerCase()).join(" and ")}`;
+    bio += `, supplemented by ${otherKeys(econ.econs, econ.topEcon).join(", ")}`;
   }
   bio += `.\n\n`;
-
   if (econ.sectorTotals) {
     const t = econ.sectorTotals;
-    bio += `Across the claimed territory, economic output breaks down to roughly ` +
-      `${t.Services}% Services, ${t.Manufacturing}% Manufacturing, and ` +
-      `${t.Extraction}% Extraction.\n\n`;
+    bio += `Output breakdown: roughly ${t.Services}% Services, ${t.Manufacturing}% Manufacturing, ` +
+      `and ${t.Extraction}% Extraction.\n\n`;
   }
+
+  bio += `## Resources & Production\n\n`;
+  bio += `*(Resources, energy production, and food production haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
+
+  bio += `## Stable Population\n\n`;
+  bio += `*(Population hasn't been set yet - add it here or in the BBC code before submitting.)*\n\n`;
 
   bio += `Claimed provinces: ${provinceList}.`;
 
