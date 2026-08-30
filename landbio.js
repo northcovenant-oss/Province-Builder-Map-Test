@@ -114,6 +114,11 @@ function buildBioText(provinces, econ) {
       (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `.\n\n`;
     const desc = ECONOMY_DESCRIPTIONS[classification.name];
     if (desc) bio += `${desc}\n\n`;
+
+    const exports = buildWorldExports(classification.name, t).filter(Boolean);
+    if (exports.length > 0) {
+      bio += `Top exports, in order: ${exports.join(", ")}.\n\n`;
+    }
   }
 
   // TESTING ONLY - remove this block once the Light/Heavy Industry formula
@@ -201,7 +206,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 [*][u]Economy Type[/u]: 
  [i]{{ECON_TYPE}}[/i][list][*]{{ECON_TYPE_DESC}}
 [/list][*][u]World Exports[/u]: 
- [list]| 1[sup]st[/sup] :  | 2[sup]nd[/sup] : | 3[sup]rd[/sup] : | 4[sup]th[/sup] : | 5[sup]th[/sup] :  |[/list] 
+ [list]| 1[sup]st[/sup] : {{EXPORT_1}} | 2[sup]nd[/sup] : {{EXPORT_2}} | 3[sup]rd[/sup] : {{EXPORT_3}} | 4[sup]th[/sup] : {{EXPORT_4}} | 5[sup]th[/sup] : {{EXPORT_5}} |[/list] 
  [*][i]Please look over the [url=[/url] to understand how your economy fits into the region.[/i][/list] 
 
 [b]Resources & Production[/b]:
@@ -236,6 +241,9 @@ function buildBBCCode(provinces, econ) {
   // these, not the more granular per-province category.
   const econType = econ.classification ? econ.classification.name : econ.topEcon;
   const econTypeDesc = econ.classification ? (ECONOMY_DESCRIPTIONS[econ.classification.name] || "") : "";
+  const exports = econ.classification && econ.sectorTotals
+    ? buildWorldExports(econ.classification.name, econ.sectorTotals)
+    : ["", "", "", "", ""];
 
   return BBC_TEMPLATE
     .replace("{{CLIMATE_BLOCK}}", climateBlock)
@@ -243,7 +251,12 @@ function buildBBCCode(provinces, econ) {
     .replace("{{ECON_TYPE_DESC}}", econTypeDesc)
     .replace("{{PRIMARY_PCT}}", primaryPct)
     .replace("{{SECONDARY_PCT}}", secondaryPct)
-    .replace("{{TERTIARY_PCT}}", tertiaryPct);
+    .replace("{{TERTIARY_PCT}}", tertiaryPct)
+    .replace("{{EXPORT_1}}", exports[0])
+    .replace("{{EXPORT_2}}", exports[1])
+    .replace("{{EXPORT_3}}", exports[2])
+    .replace("{{EXPORT_4}}", exports[3])
+    .replace("{{EXPORT_5}}", exports[4]);
 }
 
 // ---- climate reference data ----
@@ -516,6 +529,94 @@ function classifyEconomy(sectorTotals) {
 
   pool.sort((a, b) => b.pct - a.pct);
   return pool[0];
+}
+
+// ---- World Exports (the 1st-5th ranked list) ----
+//
+// Which of the four base sectors defines each classification, used to
+// build its export ranking below. Single-item arrays are the four
+// "specialized" (tier 1) economies; two-item arrays are the six
+// "combined" (tier 2) ones. "Diversified Economy" has no defined ranking
+// rule (it wasn't one of the ten named types this was designed for), so
+// it's left out - buildWorldExports() returns five blanks for it.
+const ECONOMY_SECTOR_KEYS = {
+  "Service Economy":                    ["Services"],
+  "Consumer Goods Economy":              ["LightIndustry"],
+  "Industrial Economy":                  ["HeavyIndustry"],
+  "Resource Economy":                    ["Extraction"],
+  "Consumer Goods & Services Economy":   ["Services", "LightIndustry"],
+  "Consumer Goods & Materials Economy":  ["LightIndustry", "Extraction"],
+  "Manufacturing Economy":               ["LightIndustry", "HeavyIndustry"],
+  "Industrial Goods & Services Economy": ["HeavyIndustry", "Services"],
+  "Industrial Goods & Materials Economy":["HeavyIndustry", "Extraction"],
+  "Non-Industrial Economy":              ["Services", "Extraction"],
+};
+
+const SECTOR_EXPORT_LABEL = {
+  Services: "Services",
+  LightIndustry: "Consumer Goods",
+  HeavyIndustry: "Industrial Goods",
+  Extraction: "Raw Materials",
+};
+const ALL_SECTOR_KEYS = ["Services", "LightIndustry", "HeavyIndustry", "Extraction"];
+
+// Returns [1st, 2nd, 3rd, 4th, 5th] export labels for a classification,
+// given the claim's aggregate sector totals.
+function buildWorldExports(classificationName, sectorTotals) {
+  const keys = ECONOMY_SECTOR_KEYS[classificationName];
+  if (!keys || !sectorTotals) return ["", "", "", "", ""];
+
+  const label = k => SECTOR_EXPORT_LABEL[k];
+  const val = k => sectorTotals[k] || 0;
+
+  if (keys.length === 1) {
+    // ---- Specialized economies (one sector > 50%) ----
+    // 1st-3rd are all that same dominant sector.
+    const main = keys[0];
+    const mainLabel = label(main);
+    const others = ALL_SECTOR_KEYS.filter(k => k !== main);
+
+    // 4th: any other sector(s) over 20%; none -> repeat the main sector.
+    // (All three others exceeding 20% at once isn't mathematically
+    // possible here, since together they can't exceed the ~50% left over
+    // once the dominant sector takes its share.)
+    const above20 = others.filter(k => val(k) > 20);
+    const slot4 = above20.length === 0 ? mainLabel : above20.map(label).join(" or ");
+
+    // 5th: same, but at a 15% threshold - here all three others clearing
+    // 15% each IS possible, hence the "Any" case.
+    const above15 = others.filter(k => val(k) > 15);
+    const slot5 = above15.length === 0 ? mainLabel
+      : above15.length === 3 ? "Any"
+      : above15.map(label).join(" or ");
+
+    return [mainLabel, mainLabel, mainLabel, slot4, slot5];
+  }
+
+  // ---- Combined economies (a pair of sectors > 50% together) ----
+  const [a, b] = keys;
+  const first = val(a) >= val(b) ? a : b; // ties default to the first-listed sector
+  const second = first === a ? b : a;
+  const firstLabel = label(first), secondLabel = label(second);
+
+  // 3rd: both paired sectors individually over 25% -> "X or Y"; otherwise repeat 1st.
+  const slot3 = (val(first) > 25 && val(second) > 25)
+    ? `${firstLabel} or ${secondLabel}`
+    : firstLabel;
+
+  // 4th/5th look at the OTHER two sectors (the ones not part of this
+  // classification's defining pair), same "none -> repeat / one -> that
+  // one / both -> "or" or "Any"" pattern as the specialized case.
+  const others = ALL_SECTOR_KEYS.filter(k => k !== a && k !== b);
+  const above20 = others.filter(k => val(k) > 20);
+  const slot4 = above20.length === 0 ? secondLabel : above20.map(label).join(" or ");
+
+  const above15 = others.filter(k => val(k) > 15);
+  const slot5 = above15.length === 0 ? secondLabel
+    : above15.length === 2 ? "Any"
+    : above15.map(label).join(" or ");
+
+  return [firstLabel, secondLabel, slot3, slot4, slot5];
 }
 
 // Plain-text description per classification, used both in the on-page bio
