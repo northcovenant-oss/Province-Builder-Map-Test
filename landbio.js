@@ -107,6 +107,10 @@ function buildBioText(provinces, econ) {
     const t = econ.sectorTotals;
     bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
       `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
+
+    const classification = classifyEconomy(t);
+    bio += `Economic Classification: ${classification.name}` +
+      (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `.\n\n`;
   }
 
   // TESTING ONLY - remove this block once the Light/Heavy Industry formula
@@ -437,6 +441,60 @@ function computeSectorTotals(splits) {
   rounded.Manufacturing = rounded.LightIndustry + rounded.HeavyIndustry;
 
   return rounded;
+}
+
+// ---- economy classification ----
+//
+// A single descriptive label for the claim's overall economic character,
+// derived from the aggregate Services / Light Industry / Heavy Industry /
+// Extraction totals. Checked in two tiers:
+//
+//   1. The four "pure" economies (>50% in one sector alone). At most one
+//      of these can ever be true at once, since two sectors can't each
+//      individually exceed 50% of a 100% total.
+//   2. Only if none of those match, the six blended two-sector economies
+//      (>50% combined). Multiple of these CAN be true simultaneously
+//      (e.g. Services+Light both also make Services+Extraction pass if
+//      Extraction is nonzero), so whichever has the largest combined
+//      percentage wins.
+//
+// Tier 1 has to be checked first and separately - if every candidate were
+// thrown into one flat "largest percentage wins" pool, a pure economy
+// would almost never win, since adding any second sector's percentage on
+// top of it only makes the combined number bigger. That would make the
+// four pure economies effectively unreachable.
+const ECONOMY_TYPES = [
+  { name: "Service Economy",                    tier: 1, pct: t => t.Services },
+  { name: "Consumer Goods Economy",              tier: 1, pct: t => t.LightIndustry },
+  { name: "Industrial Economy",                  tier: 1, pct: t => t.HeavyIndustry },
+  { name: "Resource Economy",                    tier: 1, pct: t => t.Extraction },
+  { name: "Consumer Goods & Services Economy",   tier: 2, pct: t => t.Services + t.LightIndustry },
+  { name: "Consumer Goods & Materials Economy",  tier: 2, pct: t => t.LightIndustry + t.Extraction },
+  { name: "Manufacturing Economy",               tier: 2, pct: t => t.LightIndustry + t.HeavyIndustry },
+  { name: "Industrial Goods & Services Economy", tier: 2, pct: t => t.HeavyIndustry + t.Services },
+  { name: "Industrial Goods & Materials Economy",tier: 2, pct: t => t.HeavyIndustry + t.Extraction },
+  { name: "Non-Industrial Economy",              tier: 2, pct: t => t.Services + t.Extraction },
+];
+
+function classifyEconomy(sectorTotals) {
+  const tier1 = ECONOMY_TYPES.filter(e => e.tier === 1)
+    .map(e => ({ name: e.name, pct: e.pct(sectorTotals) }))
+    .filter(e => e.pct > 50);
+
+  const pool = tier1.length > 0
+    ? tier1
+    : ECONOMY_TYPES.filter(e => e.tier === 2)
+        .map(e => ({ name: e.name, pct: e.pct(sectorTotals) }))
+        .filter(e => e.pct > 50);
+
+  if (pool.length === 0) {
+    // Only possible when the sectors are split too evenly for any single
+    // sector, or any pair, to break 50% (e.g. close to a 25/25/25/25 split).
+    return { name: "Diversified Economy", pct: null };
+  }
+
+  pool.sort((a, b) => b.pct - a.pct);
+  return pool[0];
 }
 
 // ---- small helpers ----
