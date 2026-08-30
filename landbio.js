@@ -98,8 +98,8 @@ function buildBioText(provinces, econ) {
   bio += `.\n\n`;
   if (econ.sectorTotals) {
     const t = econ.sectorTotals;
-    bio += `Output breakdown: roughly ${t.Services}% Services, ${t.Manufacturing}% Manufacturing, ` +
-      `and ${t.Extraction}% Extraction.\n\n`;
+    bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
+      `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
   }
 
   bio += `## Resources & Production\n\n`;
@@ -188,7 +188,12 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 function buildBBCCode(provinces, econ) {
   let primaryPct = "", secondaryPct = "", tertiaryPct = "";
   if (econ.sectorTotals) {
-    const ranked = Object.values(econ.sectorTotals).sort((a, b) => b - a);
+    // Explicitly the three combined sectors (Manufacturing = Light + Heavy
+    // recombined) - NOT Object.values(), since sectorTotals now also
+    // carries the Light/Heavy sub-buckets and this table's fixed 3-column
+    // forum-template format has no room for a 5-way ranking.
+    const t = econ.sectorTotals;
+    const ranked = [t.Services, t.Manufacturing, t.Extraction].sort((a, b) => b - a);
     [primaryPct, secondaryPct, tertiaryPct] = ranked;
   }
 
@@ -280,11 +285,13 @@ const CLIMATE_DETAILS = {
 //
 // Every province's econ category (e.g. "Service Focused", "Mineral Oriented")
 // implies a ranking of three underlying sectors — Services, Manufacturing,
-// and Extraction — and "Focused" vs "Oriented" controls how lopsided the
-// split is. This is computed fresh each time a bio is generated; if you'd
-// rather lock these numbers in per-province instead of re-rolling them
-// every time, this is the place to swap random generation for a lookup
-// against a value stored in data.js.
+// and Extraction. The primary sector's percentage is randomized per-category
+// using PRIMARY_RANGE below; "Focused" vs "Oriented" then controls how the
+// remaining percentage splits between secondary and tertiary. This is
+// computed fresh each time a bio is generated; if you'd rather lock these
+// numbers in per-province instead of re-rolling them every time, this is
+// the place to swap random generation for a lookup against a value stored
+// in data.js.
 
 const ECON_SECTOR_CONFIG = {
   "Service Focused":      { order: ["Services", "Manufacturing", "Extraction"], magnitude: "focused" },
@@ -298,60 +305,115 @@ const ECON_SECTOR_CONFIG = {
   "Mineral Oriented":     { order: ["Extraction", "Manufacturing", "Services"], magnitude: "oriented" },
 };
 
+// Primary sector's percentage is rolled within this per-category range
+// (inclusive), replacing the old flat 70–90 (focused) / 41–70 (oriented)
+// ranges with tighter, category-specific ones.
+const PRIMARY_RANGE = {
+  "Agriculture Focused":  [55, 75],
+  "Agriculture Oriented": [40, 60],
+  "Production Focused":   [45, 70],
+  "Service Focused":      [50, 75],
+  "Service Oriented":     [35, 55],
+  "Mineral Focused":      [55, 75],
+  "Mineral Oriented":     [40, 60],
+  "Energy Focused":       [55, 75],
+  "Energy Oriented":      [40, 60],
+};
+
+// The tertiary (3rd) sector always gets at least this many percentage
+// points, no matter how primary and secondary roll.
+const TERTIARY_MIN_PCT = 8;
+
+// Manufacturing is further split into Light Industry and Heavy Industry.
+// Light Industry = Manufacturing % × this factor (rounded); Heavy Industry
+// is whatever's left, so Light + Heavy always equals Manufacturing exactly
+// for that province.
+const LIGHT_INDUSTRY_FACTOR = {
+  "Service Focused":      0.75,
+  "Service Oriented":     0.50,
+  "Production Focused":   0.25,
+  "Energy Focused":       0.10,
+  "Energy Oriented":      0.20,
+  "Agriculture Focused":  0.75,
+  "Agriculture Oriented": 0.80,
+  "Mineral Focused":      0.10,
+  "Mineral Oriented":     0.20,
+};
+
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Returns { Services, Manufacturing, Extraction } percentages (integers,
-// summing to 100) for a single province's econ category, or null if the
-// category isn't recognized.
+// Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
+// percentages (integers) for a single province's econ category, or null if
+// the category isn't recognized. Services + Manufacturing + Extraction sum
+// to 100; LightIndustry + HeavyIndustry sum to exactly Manufacturing.
 function computeSectorSplit(econName) {
   const config = ECON_SECTOR_CONFIG[econName];
   if (!config) return null;
 
   const [primaryKey, secondaryKey, tertiaryKey] = config.order;
-  let primary, secondary;
+  const range = PRIMARY_RANGE[econName] || (config.magnitude === "focused" ? [70, 90] : [41, 70]);
+  const primary = randInt(range[0], range[1]);
 
-  if (config.magnitude === "focused") {
-    primary = randInt(70, 90);
-    secondary = randInt(9, 99 - primary);
-  } else {
-    primary = randInt(41, 70);
-    secondary = randInt(9, Math.min(99 - primary, primary));
-  }
+  // Secondary is capped two ways at once: it can never exceed the primary
+  // (hence the `primary` term below), and the tertiary sector must be left
+  // with at least TERTIARY_MIN_PCT (8%) once primary and secondary are
+  // both subtracted from 100 (hence the `100 - TERTIARY_MIN_PCT - primary`
+  // term). Both apply the same way regardless of Focused vs Oriented.
+  const secondaryMax = Math.min(100 - TERTIARY_MIN_PCT - primary, primary);
+  const secondary = randInt(9, secondaryMax);
   const tertiary = 100 - primary - secondary;
 
-  return {
+  const split = {
     [primaryKey]: primary,
     [secondaryKey]: secondary,
     [tertiaryKey]: tertiary,
   };
+
+  const factor = LIGHT_INDUSTRY_FACTOR[econName] != null ? LIGHT_INDUSTRY_FACTOR[econName] : 0.5;
+  const manufacturing = split.Manufacturing || 0;
+  const light = Math.round(manufacturing * factor);
+  split.LightIndustry = light;
+  split.HeavyIndustry = manufacturing - light;
+
+  return split;
 }
 
 // Averages a list of per-province sector splits into one overall
 // breakdown, rounded to whole percentages that still sum to 100.
+// Returns Services / LightIndustry / HeavyIndustry / Extraction (the four
+// displayed buckets, always summing to 100) plus Manufacturing (the
+// unsplit Light+Heavy total, kept around for the BBC code's ranked
+// Primary/Secondary/Tertiary columns, which mirror the forum template's
+// fixed 3-column structure rather than this 4-way breakdown).
 function computeSectorTotals(splits) {
-  const sectors = ["Services", "Manufacturing", "Extraction"];
+  const allKeys = ["Services", "Extraction", "LightIndustry", "HeavyIndustry"];
   const raw = {};
-  sectors.forEach(s => {
+  allKeys.forEach(s => {
     raw[s] = splits.reduce((sum, sp) => sum + (sp[s] || 0), 0) / splits.length;
   });
 
   const rounded = {};
   let roundedSum = 0;
-  sectors.forEach(s => {
+  allKeys.forEach(s => {
     rounded[s] = Math.round(raw[s]);
     roundedSum += rounded[s];
   });
 
   // Rounding can drift the total off 100 by a point or two — nudge the
-  // largest sector to absorb the difference so the displayed total is
+  // largest bucket to absorb the difference so the displayed total is
   // always exactly 100%.
   const diff = 100 - roundedSum;
   if (diff !== 0) {
-    const largest = sectors.reduce((a, b) => (rounded[a] >= rounded[b] ? a : b));
+    const largest = allKeys.reduce((a, b) => (rounded[a] >= rounded[b] ? a : b));
     rounded[largest] += diff;
   }
+
+  // Manufacturing = Light + Heavy, recombined post-rounding so it stays
+  // consistent with the two displayed sub-buckets above.
+  rounded.Manufacturing = rounded.LightIndustry + rounded.HeavyIndustry;
+
   return rounded;
 }
 
