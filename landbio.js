@@ -63,10 +63,17 @@ function computeEconomics(provinces) {
   const topClimate = topEntry(climates);
   const topEcon = topEntry(econs);
 
-  const sectorSplits = provinces.map(p => computeSectorSplit(p.econ)).filter(Boolean);
+  // Keep each province's own roll paired with its label/econ (not just the
+  // blended total) - buildBioText uses this for the per-province testing
+  // breakdown so the underlying per-province math can actually be checked,
+  // not just trusted from the aggregate.
+  const perProvinceSectors = provinces
+    .map(p => ({ label: p.label, econ: p.econ, split: computeSectorSplit(p.econ) }))
+    .filter(entry => entry.split);
+  const sectorSplits = perProvinceSectors.map(entry => entry.split);
   const sectorTotals = sectorSplits.length > 0 ? computeSectorTotals(sectorSplits) : null;
 
-  return { continents, climates, econs, topClimate, topEcon, sectorTotals };
+  return { continents, climates, econs, topClimate, topEcon, sectorTotals, perProvinceSectors };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -100,6 +107,21 @@ function buildBioText(provinces, econ) {
     const t = econ.sectorTotals;
     bio += `Output breakdown: roughly ${t.Services}% Services, ${t.LightIndustry}% Light Industry, ` +
       `${t.HeavyIndustry}% Heavy Industry, and ${t.Extraction}% Extraction.\n\n`;
+  }
+
+  // TESTING ONLY - remove this block once the Light/Heavy Industry formula
+  // is confirmed correct. It lists each province's own roll (rather than
+  // just the blended claim-wide total above) so the per-province math can
+  // actually be checked against ECON_SECTOR_CONFIG / PRIMARY_RANGE /
+  // LIGHT_INDUSTRY_FACTOR, not just trusted from the average.
+  if (econ.perProvinceSectors && econ.perProvinceSectors.length > 0) {
+    bio += `[Testing] Per-province sector breakdown:\n`;
+    econ.perProvinceSectors.forEach(entry => {
+      const s = entry.split;
+      bio += `${entry.label} (${entry.econ}): ${s.Services}% Services, ${s.LightIndustry}% Light Industry, ` +
+        `${s.HeavyIndustry}% Heavy Industry, ${s.Extraction}% Extraction\n`;
+    });
+    bio += `\n`;
   }
 
   bio += `## Resources & Production\n\n`;
