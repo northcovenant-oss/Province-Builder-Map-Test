@@ -86,14 +86,15 @@ function computeEconomics(provinces) {
   const sectorTotals = sectorSplits.length > 0 ? computeSectorTotals(sectorSplits) : null;
   const classification = sectorTotals ? classifyEconomy(sectorTotals) : null;
 
-  // Population: each province rolled independently (base 400,000-5 million x
+  // Population: each province rolled independently (base 400,000-3 million x
   // its own econ modifier x its own climate modifier), then summed.
   const perProvincePopulation = provinces.map(p => ({ label: p.label, population: computeProvincePopulation(p) }));
   const totalPopulation = perProvincePopulation.reduce((sum, e) => sum + e.population, 0);
 
   const energyProduction = computeEnergyProduction(provinces);
+  const foodProduction = computeFoodProduction(provinces);
 
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction };
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -159,7 +160,7 @@ function buildBioText(provinces, econ) {
   bio += `## Resources & Production\n\n`;
   bio += `*(Resources haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
   bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.energyProduction.total)}\n\n`;
-  bio += `*(Food production hasn't been filled in yet - add it here or in the BBC code before submitting.)*\n\n`;
+  bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.foodProduction.total)}\n\n`;
 
   bio += `## Stable Population\n\n`;
   bio += `%%FIELD%%Population|${formatNumber(econ.totalPopulation)}\n\n`;
@@ -260,7 +261,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 [b]Resources & Production[/b]:
 [list][*][u]Resources[/u]:
 [*][u]Energy Production[/u]: {{ENERGY_PRODUCTION}}
-[*][u]Food Production[/u]: [/list]
+[*][u]Food Production[/u]: {{FOOD_PRODUCTION}}[/list]
 
 [b]Stable Population[/b]:
 [list][*][u]Population[/u]: {{POPULATION}}
@@ -315,7 +316,8 @@ function buildBBCCode(provinces, econ) {
     .replace("{{EXPORT_4}}", exports[3])
     .replace("{{EXPORT_5}}", exports[4])
     .replace("{{POPULATION}}", formatNumber(econ.totalPopulation))
-    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total));
+    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total))
+    .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.foodProduction.total));
 }
 
 // ---- climate reference data ----
@@ -435,7 +437,7 @@ function randInt(min, max) {
 
 // ---- population ----
 //
-// Each province gets a randomized base population (400,000-5 million), then
+// Each province gets a randomized base population (400,000-3 million), then
 // scaled by its econ category's and dominant climate's modifiers below.
 // Computed once per province in computeEconomics (same pass as the sector
 // splits) so the prose text and the BBC code always show the same total.
@@ -467,7 +469,7 @@ const CLIMATE_POPULATION_MODIFIER = {
 };
 
 function computeProvincePopulation(p) {
-  const base = randInt(400000, 5000000);
+  const base = randInt(400000, 3000000);
   const econMod = ECON_POPULATION_MODIFIER[p.econ] != null ? ECON_POPULATION_MODIFIER[p.econ] : 1;
   const climateName = p.climate ? p.climate.dominant : null;
   const climateMod = (climateName && CLIMATE_POPULATION_MODIFIER[climateName] != null) ? CLIMATE_POPULATION_MODIFIER[climateName] : 1;
@@ -542,6 +544,67 @@ function energyStatusLabel(n) {
 
 function formatEnergyProduction(n) {
   return `${formatSigned(n)} ${energyStatusLabel(n)}`;
+}
+
+// ---- food production ----
+//
+// Same claim-size-scaled-random-sum pattern as Energy Production above,
+// but with two differences: Agriculture categories use the T2 multiplier
+// while every other category uses U2 (Energy Production split on Energy
+// vs everyone else; this one splits on Agriculture vs everyone else),
+// and the summed total gets a flat -20-per-selected-province penalty
+// applied before classifying into one of five Food Production tiers.
+const FOOD_COUNT_BRACKETS = [
+  { min: 1,  max: 4,        T2: 0.75, U2: 0.75 },
+  { min: 5,  max: 10,       T2: 0.80, U2: 0.75 },
+  { min: 11, max: 20,       T2: 1.00, U2: 1.00 },
+  { min: 21, max: Infinity, T2: 1.50, U2: 1.75 },
+];
+function getFoodCountModifiers(numProvinces) {
+  const bracket = FOOD_COUNT_BRACKETS.find(b => numProvinces >= b.min && numProvinces <= b.max);
+  return bracket || FOOD_COUNT_BRACKETS[0];
+}
+
+const FOOD_OUTPUT_CONFIG = {
+  "Service Focused":      { range: [5, 10],  uses: "U2" },
+  "Service Oriented":     { range: [10, 20], uses: "U2" },
+  "Production Focused":   { range: [1, 10],  uses: "U2" },
+  "Energy Focused":       { range: [1, 5],   uses: "U2" },
+  "Energy Oriented":      { range: [5, 15],  uses: "U2" },
+  "Agriculture Focused":  { range: [35, 75], uses: "T2" },
+  "Agriculture Oriented": { range: [30, 40], uses: "T2" },
+  "Mineral Focused":      { range: [1, 5],   uses: "U2" },
+  "Mineral Oriented":     { range: [5, 15],  uses: "U2" },
+};
+
+// Returns { total, perProvince, T2, U2 }. `total` is rounded once at the
+// end, after the -20/province penalty, not per-province.
+function computeFoodProduction(provinces) {
+  const { T2, U2 } = getFoodCountModifiers(provinces.length);
+  let total = 0;
+  const perProvince = provinces.map(p => {
+    const config = FOOD_OUTPUT_CONFIG[p.econ];
+    if (!config) return { label: p.label, econ: p.econ, roll: 0, value: 0 };
+    const roll = randInt(config.range[0], config.range[1]);
+    const multiplier = config.uses === "T2" ? T2 : U2;
+    const value = roll * multiplier;
+    total += value;
+    return { label: p.label, econ: p.econ, roll, value };
+  });
+  total -= 20 * provinces.length;
+  return { total: Math.round(total), perProvince, T2, U2 };
+}
+
+function foodClassification(n) {
+  if (n < -300) return "Critical Food Importer";
+  if (n < -200) return "Major Food Importer";
+  if (n < 0) return "Minor Food Importer";
+  if (n < 200) return "Minor Food Exporter";
+  return "Major Food Exporter";
+}
+
+function formatFoodProduction(n) {
+  return `${formatSigned(n)}: ${foodClassification(n)}`;
 }
 
 // Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
@@ -774,16 +837,23 @@ function buildWorldExports(classificationName, sectorTotals) {
     ? `${firstLabel} or ${secondLabel}`
     : firstLabel;
 
-  // 4th/5th look at the OTHER two sectors (the ones not part of this
-  // classification's defining pair), same "none -> repeat / one -> that
-  // one / both -> "or" or "Any"" pattern as the specialized case.
+  // 4th looks at the OTHER two sectors only (the ones not part of this
+  // classification's defining pair) - "none -> repeat 2nd / one -> that
+  // one / both -> "X or Y"".
   const others = ALL_SECTOR_KEYS.filter(k => k !== a && k !== b);
   const above20 = others.filter(k => val(k) > 20);
   const slot4 = above20.length === 0 ? secondLabel : above20.map(label).join(" or ");
 
-  const above15 = others.filter(k => val(k) > 15);
+  // 5th looks at ALL FOUR sectors, not just the "other two" - the pair
+  // already used in slots 1-3 is still eligible here too, so a sector
+  // that's already 1st or 2nd place can also show up in the 5th slot's
+  // list. (Only "Any" is reserved for every sector clearing 15% at once;
+  // since four sector percentages always sum to 100, at least one sector
+  // is guaranteed to be above 15%, so the "nothing qualifies" fallback
+  // below can't actually happen - it's just there for safety.)
+  const above15 = ALL_SECTOR_KEYS.filter(k => val(k) > 15);
   const slot5 = above15.length === 0 ? secondLabel
-    : above15.length === 2 ? "Any"
+    : above15.length === ALL_SECTOR_KEYS.length ? "Any"
     : above15.map(label).join(" or ");
 
   return [firstLabel, secondLabel, slot3, slot4, slot5];
