@@ -86,7 +86,14 @@ function computeEconomics(provinces) {
   const sectorTotals = sectorSplits.length > 0 ? computeSectorTotals(sectorSplits) : null;
   const classification = sectorTotals ? classifyEconomy(sectorTotals) : null;
 
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification };
+  // Population: each province rolled independently (base 400,000-5 million x
+  // its own econ modifier x its own climate modifier), then summed.
+  const perProvincePopulation = provinces.map(p => ({ label: p.label, population: computeProvincePopulation(p) }));
+  const totalPopulation = perProvincePopulation.reduce((sum, e) => sum + e.population, 0);
+
+  const energyProduction = computeEnergyProduction(provinces);
+
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -150,10 +157,12 @@ function buildBioText(provinces, econ) {
   }
 
   bio += `## Resources & Production\n\n`;
-  bio += `*(Resources, energy production, and food production haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
+  bio += `*(Resources haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
+  bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.energyProduction.total)}\n\n`;
+  bio += `*(Food production hasn't been filled in yet - add it here or in the BBC code before submitting.)*\n\n`;
 
   bio += `## Stable Population\n\n`;
-  bio += `*(Population hasn't been set yet - add it here or in the BBC code before submitting.)*\n\n`;
+  bio += `%%FIELD%%Population|${formatNumber(econ.totalPopulation)}\n\n`;
 
   bio += `Claimed provinces: ${provinceList}.`;
 
@@ -250,11 +259,12 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 
 [b]Resources & Production[/b]:
 [list][*][u]Resources[/u]:
-[*][u]Energy Production[/u]:[*][u]Energy Production[/u]:
+[*][u]Energy Production[/u]: {{ENERGY_PRODUCTION}}
 [*][u]Food Production[/u]: [/list]
 
 [b]Stable Population[/b]:
-[list][*][i]Look over the [url=[/url] when choosing your population.[/i][/list][/list]
+[list][*][u]Population[/u]: {{POPULATION}}
+[*][i]Look over the [url=[/url] when choosing your population.[/i][/list][/list]
 [i]If you have any questions or concerns feel free to contact me otherwise use this information to complete the application and you are all set[/i]
 [/spoiler]`;
 
@@ -303,7 +313,9 @@ function buildBBCCode(provinces, econ) {
     .replace("{{EXPORT_2}}", exports[1])
     .replace("{{EXPORT_3}}", exports[2])
     .replace("{{EXPORT_4}}", exports[3])
-    .replace("{{EXPORT_5}}", exports[4]);
+    .replace("{{EXPORT_5}}", exports[4])
+    .replace("{{POPULATION}}", formatNumber(econ.totalPopulation))
+    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total));
 }
 
 // ---- climate reference data ----
@@ -419,6 +431,117 @@ const LIGHT_INDUSTRY_FACTOR = {
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// ---- population ----
+//
+// Each province gets a randomized base population (400,000-5 million), then
+// scaled by its econ category's and dominant climate's modifiers below.
+// Computed once per province in computeEconomics (same pass as the sector
+// splits) so the prose text and the BBC code always show the same total.
+const ECON_POPULATION_MODIFIER = {
+  "Service Focused":      1.4,
+  "Service Oriented":     1,
+  "Production Focused":   1.3,
+  "Energy Focused":       0.5,
+  "Energy Oriented":      0.6,
+  "Agriculture Focused":  0.8,
+  "Agriculture Oriented": 0.9,
+  "Mineral Focused":      0.5,
+  "Mineral Oriented":     0.6,
+};
+
+const CLIMATE_POPULATION_MODIFIER = {
+  "Polar":               0.1,
+  "Tundra":              0.25,
+  "Sub Arctic":          0.5,
+  "Highlands":           0.7,
+  "Arid":                0.8,
+  "Semi-Arid":           0.9,
+  "Mediterranean":       1,
+  "Tropical Wet Dry":    1.05,
+  "Humid Continental":   1.1,
+  "Oceanic":             1.15,
+  "Tropical Rainforest": 1.3,
+  "Humid Subtropical":   1.35,
+};
+
+function computeProvincePopulation(p) {
+  const base = randInt(400000, 5000000);
+  const econMod = ECON_POPULATION_MODIFIER[p.econ] != null ? ECON_POPULATION_MODIFIER[p.econ] : 1;
+  const climateName = p.climate ? p.climate.dominant : null;
+  const climateMod = (climateName && CLIMATE_POPULATION_MODIFIER[climateName] != null) ? CLIMATE_POPULATION_MODIFIER[climateName] : 1;
+  return Math.round(base * econMod * climateMod);
+}
+
+function formatNumber(n) {
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// ---- energy production ----
+//
+// A single claim-wide modifier, not a per-province one. Every province
+// rolls a random value from a range set by its econ category, then that
+// roll gets scaled by a claim-size multiplier - P2 for every category
+// except the two Energy ones, which use O2 instead (both P2 and O2 come
+// from the SAME claim-size bracket, just different columns of it). The
+// per-province results are summed, then rounded once at the end.
+const ENERGY_COUNT_BRACKETS = [
+  { min: 1,  max: 4,       P2: 0.25, O2: 0.50 },
+  { min: 5,  max: 10,      P2: 0.50, O2: 0.75 },
+  { min: 11, max: 20,      P2: 1.00, O2: 1.00 },
+  { min: 21, max: Infinity, P2: 1.70, O2: 2.00 },
+];
+function getEnergyCountModifiers(numProvinces) {
+  const bracket = ENERGY_COUNT_BRACKETS.find(b => numProvinces >= b.min && numProvinces <= b.max);
+  return bracket || ENERGY_COUNT_BRACKETS[0];
+}
+
+const ENERGY_OUTPUT_CONFIG = {
+  "Service Focused":      { range: [-2, 0],  uses: "P2" },
+  "Service Oriented":     { range: [-3, -1], uses: "P2" },
+  "Production Focused":   { range: [-7, -5], uses: "P2" },
+  "Energy Focused":       { range: [15, 30], uses: "O2" },
+  "Energy Oriented":      { range: [5, 15],  uses: "O2" },
+  "Agriculture Focused":  { range: [-2, 1],  uses: "P2" },
+  "Agriculture Oriented": { range: [-3, 0],  uses: "P2" },
+  "Mineral Focused":      { range: [-5, -3], uses: "P2" },
+  "Mineral Oriented":     { range: [-3, -1], uses: "P2" },
+};
+
+// Returns { total, perProvince, P2, O2 }. `total` is rounded once at the
+// end (not per-province) to avoid compounding rounding error across a
+// large claim.
+function computeEnergyProduction(provinces) {
+  const { P2, O2 } = getEnergyCountModifiers(provinces.length);
+  let total = 0;
+  const perProvince = provinces.map(p => {
+    const config = ENERGY_OUTPUT_CONFIG[p.econ];
+    if (!config) return { label: p.label, econ: p.econ, roll: 0, value: 0 };
+    const roll = randInt(config.range[0], config.range[1]);
+    const multiplier = config.uses === "O2" ? O2 : P2;
+    const value = roll * multiplier;
+    total += value;
+    return { label: p.label, econ: p.econ, roll, value };
+  });
+  return { total: Math.round(total), perProvince, P2, O2 };
+}
+
+function formatSigned(n) {
+  return (n >= 0 ? "+" : "") + n;
+}
+
+// "Energy Dependent" / "Energy Surplus" per the sign of the total. Exactly
+// 0 wasn't specified either way, so it gets its own "Energy Balanced"
+// label rather than being lumped into one of the other two.
+function energyStatusLabel(n) {
+  if (n < 0) return "Energy Dependent";
+  if (n > 0) return "Energy Surplus";
+  return "Energy Balanced";
+}
+
+function formatEnergyProduction(n) {
+  return `${formatSigned(n)} ${energyStatusLabel(n)}`;
 }
 
 // Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
