@@ -504,16 +504,23 @@
           }
           // "%%FIELD%%Label|Value" -> a labeled field, matching the BBC
           // code's "[u]Label[/u]: value" lines (e.g. "Economy Type:").
+          // Values that are plain URLs (the External Link field) render as
+          // an actual clickable link instead of plain text.
           if(para.indexOf('%%FIELD%%') === 0){
             const parts = para.slice(9).split('|');
+            const value = parts.slice(1).join('|');
+            const isUrl = /^https?:\/\/\S+$/.test(value.trim());
+            const valueHtml = isUrl
+              ? '<a href="' + escapeHtml(value.trim()) + '" target="_blank" rel="noopener">' + escapeHtml(value.trim()) + '</a>'
+              : escapeHtml(value);
             return '<p class="bio-field"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
-              '<span class="bio-field-value">' + escapeHtml(parts.slice(1).join('|')) + '</span></p>';
+              '<span class="bio-field-value">' + valueHtml + '</span></p>';
           }
           // "%%TABLE%%Heading|Label1:Val1|Label2:Val2|..." -> a labeled
           // small table (any number of columns), matching the BBC code's
           // own tables (World Exports, the sector percentage row).
           if(para.indexOf('%%TABLE%%') === 0){
-            const segments = para.slice(10).split('|');
+            const segments = para.slice(9).split('|');
             const heading = segments[0];
             const cells = segments.slice(1).map(function(c){
               const i = c.indexOf(':');
@@ -550,6 +557,7 @@
       '  .bio-field{ font-family:var(--font-body); font-size:16px; line-height:1.6; color:var(--ink); margin:0 0 4px; }\n' +
       '  .bio-field-label{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--ink-soft); margin-right:2px; }\n' +
       '  .bio-field-value{ font-style:italic; font-weight:600; }\n' +
+      '  .bio-field-value a{ color:var(--gold); word-break:break-all; }\n' +
       '  .bio-export-table{ width:100%; border-collapse:collapse; margin:6px 0 14px; font-family:var(--font-body); font-size:13.5px; }\n' +
       '  .bio-export-table th{ font-family:var(--font-display); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--ink-soft); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); }\n' +
       '  .bio-export-table td{ padding:8px 10px; color:var(--ink); border-bottom:1px solid var(--line); vertical-align:top; }\n' +

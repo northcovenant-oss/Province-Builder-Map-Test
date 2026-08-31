@@ -63,6 +63,18 @@ function computeEconomics(provinces) {
   const topClimate = topEntry(climates);
   const topEcon = topEntry(econs);
 
+  // Climates covering more than MAJOR_CLIMATE_THRESHOLD_PCT of the claim
+  // each get their own full write-up (in both the prose text and the BBC
+  // code); everything else is a "minor" climate, mentioned only in
+  // passing. Computed once here so buildClimateParagraphs (text) and
+  // buildBBCCode never disagree about which climates are "major."
+  const total = provinces.length;
+  const climateEntries = Object.entries(climates)
+    .map(([name, count]) => ({ name, pct: (count / total) * 100 }))
+    .sort((a, b) => b.pct - a.pct);
+  const majorClimates = climateEntries.filter(e => e.pct > MAJOR_CLIMATE_THRESHOLD_PCT);
+  const minorClimates = climateEntries.filter(e => e.pct <= MAJOR_CLIMATE_THRESHOLD_PCT);
+
   // Keep each province's own roll paired with its label/econ (not just the
   // blended total) - buildBioText uses this for the per-province testing
   // breakdown so the underlying per-province math can actually be checked,
@@ -74,7 +86,7 @@ function computeEconomics(provinces) {
   const sectorTotals = sectorSplits.length > 0 ? computeSectorTotals(sectorSplits) : null;
   const classification = sectorTotals ? classifyEconomy(sectorTotals) : null;
 
-  return { continents, climates, econs, topClimate, topEcon, sectorTotals, perProvinceSectors, classification };
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -149,30 +161,40 @@ function buildBioText(provinces, econ) {
 }
 
 // Climates covering more than this share of the claim (by province count)
-// each get their own full descriptive paragraph; anything at or below the
-// threshold gets folded into one brief "small pockets of..." mention, so a
-// claim spanning many climate zones doesn't turn into a wall of text.
+// each get their own full write-up; anything at or below the threshold
+// gets folded into one brief "small pockets of..." mention, so a claim
+// spanning many climate zones doesn't turn into a wall of text.
 const MAJOR_CLIMATE_THRESHOLD_PCT = 10;
 
 function buildClimateParagraphs(provinces, econ) {
-  const total = provinces.length;
-  const entries = Object.entries(econ.climates)
-    .map(([name, count]) => ({ name, pct: (count / total) * 100 }))
-    .sort((a, b) => b.pct - a.pct);
-
-  const major = entries.filter(e => e.pct > MAJOR_CLIMATE_THRESHOLD_PCT);
-  const minor = entries.filter(e => e.pct <= MAJOR_CLIMATE_THRESHOLD_PCT);
-
   let out = "";
-  major.forEach(e => {
+
+  // Mirrors the BBC code's own per-climate layout - [i]Name[/i] followed
+  // by labeled Season(s)/Features/Agriculture/Examples/External Link
+  // fields - so the two read as the same document. Features/Agriculture
+  // stay as normal prose paragraphs (they're long-form writing); the
+  // shorter fields use the %%FIELD%% marker map.js renders as a labeled
+  // row, same as the Economy section's fields.
+  econ.majorClimates.forEach(e => {
     const detail = CLIMATE_DETAILS[e.name];
-    out += `${e.name} climate covers roughly ${Math.round(e.pct)}% of the claimed territory. `;
-    out += detail ? `${detail.features} ${detail.agriculture}` : `${describeClimate(e.name)}.`;
-    out += `\n\n`;
+    if (!detail) {
+      out += `${e.name} climate covers roughly ${Math.round(e.pct)}% of the claimed territory. ${describeClimate(e.name)}.\n\n`;
+      return;
+    }
+    const displayName = extractBBCLabel(detail.bbc) || e.name;
+    out += `%%FIELD%%Climate|${displayName} (${Math.round(e.pct)}% of claim)\n\n`;
+    out += `${detail.features} ${detail.agriculture}\n\n`;
+
+    const seasons = extractBBCField(detail.bbc, "Season\\(s\\):");
+    if (seasons) out += `%%FIELD%%Season(s)|${seasons}\n\n`;
+    const examples = extractBBCField(detail.bbc, "Examples:");
+    if (examples) out += `%%FIELD%%Examples|${examples}\n\n`;
+    const link = extractBBCField(detail.bbc, "External Link:");
+    if (link) out += `%%FIELD%%External Link|${link}\n\n`;
   });
 
-  if (minor.length > 0) {
-    out += `Small pockets of ${joinWithAnd(minor.map(e => e.name))} round out the remaining terrain.\n\n`;
+  if (econ.minorClimates.length > 0) {
+    out += `Small pockets of ${joinWithAnd(econ.minorClimates.map(e => e.name))} round out the remaining terrain.\n\n`;
   }
 
   return out;
@@ -182,6 +204,22 @@ function joinWithAnd(items) {
   if (items.length === 1) return items[0];
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+// Pulls a labeled sub-field (Season(s), Examples, External Link, etc.) out
+// of a climate's verbatim BBC block, and the climate's own display name
+// (the text inside the leading [i]...[/i]). Parsing these out of the
+// single verbatim `bbc` string - rather than re-typing them as separate
+// fields - means there's only one place that text can ever drift from the
+// BBC code's own wording.
+function extractBBCLabel(bbcStr) {
+  const m = bbcStr.match(/^\[i\]([^\[]*)\[\/i\]/);
+  return m ? m[1].trim() : "";
+}
+function extractBBCField(bbcStr, labelPattern) {
+  const re = new RegExp("\\[u\\]" + labelPattern + "\\[/u\\]\\[list\\]([\\s\\S]*?)\\[/list\\]");
+  const m = bbcStr.match(re);
+  return m ? m[1].trim() : "";
 }
 
 // ---- BBC code output ----
@@ -232,8 +270,16 @@ function buildBBCCode(provinces, econ) {
     [primaryPct, secondaryPct, tertiaryPct] = ranked;
   }
 
-  const detail = CLIMATE_DETAILS[econ.topClimate];
-  const climateBlock = detail ? detail.bbc : `[i]${econ.topClimate}[/i][list][u]Season(s):[/u][list][/list][u]Features:[/u][list][/list][u]Agriculture:[/u][list][/list][u]Examples:[/u][list][/list][u]External Link:[/u][list][/list][/list]`;
+  // One full [i]Name[/i][list]...[/list] block per major climate (>10% of
+  // the claim), concatenated with no separator - matches how multiple
+  // climate blocks are meant to sit back to back in the forum template.
+  // Falls back to a single empty-field block if a major climate somehow
+  // isn't in CLIMATE_DETAILS.
+  const climateBlock = econ.majorClimates.map(e => {
+    const detail = CLIMATE_DETAILS[e.name];
+    return detail ? detail.bbc
+      : `[i]${e.name}[/i][list][u]Season(s):[/u][list][/list][u]Features:[/u][list][/list][u]Agriculture:[/u][list][/list][u]Examples:[/u][list][/list][u]External Link:[/u][list][/list][/list]`;
+  }).join("");
 
   // The classification (Service Economy, Industrial Economy, etc.) rather
   // than the per-province econ category (Service Focused, etc.) - this
