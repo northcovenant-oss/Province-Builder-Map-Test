@@ -94,7 +94,14 @@ function computeEconomics(provinces) {
   const energyProduction = computeEnergyProduction(provinces);
   const foodProduction = computeFoodProduction(provinces);
 
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction };
+  // GDP - built from each province's OWN food/energy/population values
+  // (already computed above, same order as `provinces`), not the claim
+  // totals. Reuses those exact numbers rather than re-rolling anything,
+  // so GDP can never drift from what's actually shown for Food/Energy/
+  // Population elsewhere on the page.
+  const gdp = computeGDP(provinces, foodProduction.perProvince, energyProduction.perProvince, perProvincePopulation);
+
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -155,6 +162,18 @@ function buildBioText(provinces, econ) {
         `${s.HeavyIndustry}% Heavy Industry, ${s.Extraction}% Extraction\n`;
     });
     bio += `\n`;
+  }
+
+  // TESTING ONLY - GDP is still being built out (currently just step 1:
+  // per-province modifier x a random econ-category base). Remove this
+  // block once the formula is confirmed correct and/or a real display
+  // format is decided on.
+  if (econ.gdp && econ.gdp.perProvince.length > 0) {
+    bio += `[Testing] Per-province GDP breakdown:\n`;
+    econ.gdp.perProvince.forEach(entry => {
+      bio += `${entry.label} (${entry.econ}): modifier ${entry.modifier.toFixed(4)} \u00d7 base ${formatCurrency(entry.base)} = ${formatCurrency(entry.gdp)}\n`;
+    });
+    bio += `Total GDP: ${formatCurrency(econ.gdp.total)}\n\n`;
   }
 
   bio += `## Resources & Production\n\n`;
@@ -605,6 +624,59 @@ function foodClassification(n) {
 
 function formatFoodProduction(n) {
   return `${formatSigned(n)}: ${foodClassification(n)}`;
+}
+
+// ---- GDP ----
+//
+// Step 1 (per province): a GDP modifier from that SAME province's own
+// Food Production, Energy Production, and Population values - not the
+// claim-wide totals.
+//   modifier = (food/20) + abs(energy/10) + (population/4,500,000)
+// Step 2: a random base dollar figure drawn from a range set by the
+// province's econ category.
+// Step 3: GDP = base x modifier.
+const GDP_RANGE = {
+  "Service Focused":      [7500000000,  40000000000],
+  "Service Oriented":     [1000000000,  55000000000],
+  "Production Focused":   [750000000,   35000000000],
+  "Energy Focused":       [500000000,   15000000000],
+  "Energy Oriented":      [250000000,   25000000000],
+  "Agriculture Focused":  [500000000,   15000000000],
+  "Agriculture Oriented": [250000000,   25000000000],
+  "Mineral Focused":      [500000000,   15000000000],
+  "Mineral Oriented":     [250000000,   25000000000],
+};
+
+function randFloat(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function computeGDPModifier(foodValue, energyValue, population) {
+  return (foodValue / 20) + Math.abs(energyValue / 10) + (population / 4500000);
+}
+
+// Requires the food/energy/population per-province arrays already built
+// elsewhere in computeEconomics (same order as `provinces`) - reuses
+// those exact values rather than re-rolling food/energy/population
+// independently here.
+function computeGDP(provinces, foodPerProvince, energyPerProvince, populationPerProvince) {
+  let total = 0;
+  const perProvince = provinces.map((p, i) => {
+    const foodValue = foodPerProvince[i] ? foodPerProvince[i].value : 0;
+    const energyValue = energyPerProvince[i] ? energyPerProvince[i].value : 0;
+    const population = populationPerProvince[i] ? populationPerProvince[i].population : 0;
+    const modifier = computeGDPModifier(foodValue, energyValue, population);
+    const range = GDP_RANGE[p.econ];
+    const base = range ? randFloat(range[0], range[1]) : 0;
+    const gdpValue = Math.round(base * modifier);
+    total += gdpValue;
+    return { label: p.label, econ: p.econ, modifier, base: Math.round(base), gdp: gdpValue };
+  });
+  return { perProvince, total: Math.round(total) };
+}
+
+function formatCurrency(n) {
+  return "$" + formatNumber(Math.round(n));
 }
 
 // Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
