@@ -166,38 +166,13 @@ function buildBioText(provinces, econ) {
     if (exports.some(Boolean)) {
       bio += `%%TABLE%%World Exports|1st:${exports[0]}|2nd:${exports[1]}|3rd:${exports[2]}|4th:${exports[3]}|5th:${exports[4]}\n\n`;
     }
-  }
 
-  // TESTING ONLY - remove this block once the Light/Heavy Industry formula
-  // is confirmed correct. It lists each province's own roll (rather than
-  // just the blended claim-wide total above) so the per-province math can
-  // actually be checked against ECON_SECTOR_CONFIG / LIGHT_INDUSTRY_FACTOR,
-  // LIGHT_INDUSTRY_FACTOR, not just trusted from the average.
-  if (econ.perProvinceSectors && econ.perProvinceSectors.length > 0) {
-    bio += `[Testing] Per-province sector breakdown:\n`;
-    econ.perProvinceSectors.forEach(entry => {
-      const s = entry.split;
-      bio += `${entry.label} (${entry.econ}): ${s.Services}% Services, ${s.LightIndustry}% Light Industry, ` +
-        `${s.HeavyIndustry}% Heavy Industry, ${s.Extraction}% Extraction\n`;
-    });
-    bio += `\n`;
-  }
-
-  // TESTING ONLY - GDP is still being built out. Remove this block once
-  // the formula is confirmed correct and/or a real display format is
-  // decided on. Uses econ.adjusted (multiplier=1 here) rather than
-  // econ.gdp directly, so these numbers always match what the population
-  // slider's client-side recompute would show at "0% change".
-  if (econ.adjusted && econ.adjusted.perProvince.length > 0) {
-    bio += `[Testing] Per-province GDP breakdown:\n`;
-    econ.adjusted.perProvince.forEach(entry => {
-      bio += `${entry.label} (${entry.econ}): ${formatCurrency(entry.gdp)}\n`;
-    });
-    bio += `\n%%FIELD%%Total GDP|${formatCurrency(econ.adjusted.totalGDP)}\n\n`;
+    if (econ.adjusted) {
+      bio += `%%FIELD%%Total GDP|${formatCurrency(econ.adjusted.totalGDP)}\n\n`;
+    }
   }
 
   bio += `## Resources & Production\n\n`;
-  bio += `*(Resources haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
   bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.adjusted.totalEnergy)}\n\n`;
   bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.adjusted.totalFood)}\n\n`;
 
@@ -299,8 +274,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
  [*][i]Please look over the [url=https://www.nationstates.net/page=dispatch/id=2811225]Economic Guide[/url] to understand how your economy fits into the region.[/i][/list] 
 
 [b]Resources & Production[/b]:
-[list][*][u]Resources[/u]:
-[*][u]Energy Production[/u]: {{ENERGY_PRODUCTION}}
+[list][*][u]Energy Production[/u]: {{ENERGY_PRODUCTION}}
 [*][u]Food Production[/u]: {{FOOD_PRODUCTION}}[/list]
 
 [b]Stable Population[/b]:
@@ -727,9 +701,14 @@ function formatCurrency(n) {
 //     with population automatically, no separate coefficient needed.
 function applyPopulationMultiplier(rawProvinces, multiplier) {
   const delta = multiplier - 1;
-  const CONSUMPTION_BASE_RATE = 10;
+  const CONSUMPTION_BASE_RATE = 10;      // above-stable growth's food/energy cost - back to
+                                          // its original strength (the "lower" rate was
+                                          // meant for below-stable, not this side)
   const CONSUMPTION_EXPONENT = 2;
-  const PRODUCTION_DECREASE_RATE = 5;
+  const PRODUCTION_DECREASE_RATE = 3;    // lowered from 5 - below-stable populations consume
+                                          // (and therefore cost) less than before
+  const GDP_POP_DECREASE_EXPONENT = 2;   // makes GDP fall off faster as population drops
+                                          // below stable - see the modifier calc below
 
   let totalPopulation = 0, totalEnergy = 0, totalFood = 0, totalGDP = 0;
   const perProvince = rawProvinces.map(function(p) {
@@ -754,7 +733,16 @@ function applyPopulationMultiplier(rawProvinces, multiplier) {
       foodValue = p.foodRaw - consumption;
     }
 
-    const modifier = (foodValue / 20) + Math.abs(energyValue / 10) + (adjustedPop / 4500000);
+    // GDP's population term shrinks faster than linearly once population
+    // drops below stable (multiplier^2 instead of multiplier), so a small
+    // population hurts GDP more sharply than before. At/above stable
+    // (multiplier>=1) this is unchanged - still plain linear growth. The
+    // two branches agree exactly at multiplier=1 (1^2 = 1), so "0% change"
+    // still matches everything computed before this feature existed.
+    const gdpPopTerm = multiplier < 1
+      ? (p.basePopulation / 4500000) * Math.pow(multiplier, GDP_POP_DECREASE_EXPONENT)
+      : (adjustedPop / 4500000);
+    const modifier = (foodValue / 20) + Math.abs(energyValue / 10) + gdpPopTerm;
     const gdp = Math.round(p.gdpBase * modifier);
 
     totalPopulation += adjustedPop;
