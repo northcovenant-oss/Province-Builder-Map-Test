@@ -43,13 +43,18 @@
 
 function generateLandBio(provinces) {
   if (!provinces || provinces.length === 0) {
-    return { text: "No provinces claimed yet.", bbcCode: "" };
+    return { text: "No provinces claimed yet.", bbcCode: "", rawProvinces: [] };
   }
 
   const economics = computeEconomics(provinces);
   return {
     text: buildBioText(provinces, economics),
     bbcCode: buildBBCCode(provinces, economics),
+    // Raw per-province Population/Energy/Food/GDP numbers, for the bio
+    // page's own population-adjustment control to recompute from
+    // client-side - see applyPopulationMultiplier and its window export
+    // near the bottom of this file.
+    rawProvinces: economics.rawProvinces,
   };
 }
 
@@ -89,7 +94,6 @@ function computeEconomics(provinces) {
   // Population: each province rolled independently (base 400,000-3 million x
   // its own econ modifier x its own climate modifier), then summed.
   const perProvincePopulation = provinces.map(p => ({ label: p.label, population: computeProvincePopulation(p) }));
-  const totalPopulation = perProvincePopulation.reduce((sum, e) => sum + e.population, 0);
 
   const energyProduction = computeEnergyProduction(provinces);
   const foodProduction = computeFoodProduction(provinces);
@@ -101,7 +105,22 @@ function computeEconomics(provinces) {
   // Population elsewhere on the page.
   const gdp = computeGDP(provinces, foodProduction.perProvince, energyProduction.perProvince, perProvincePopulation);
 
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp };
+  // Package the raw per-province numbers together so applyPopulationMultiplier
+  // can recompute Population/Energy/Food/GDP at any population level - both
+  // right here (always at multiplier=1, "0% change") and later, client-side,
+  // whenever the player picks a different level on the bio page.
+  const rawProvinces = provinces.map((p, i) => ({
+    label: p.label,
+    econ: p.econ,
+    basePopulation: perProvincePopulation[i].population,
+    energyRaw: energyProduction.perProvince[i] ? energyProduction.perProvince[i].value : 0,
+    foodRaw: foodProduction.perProvince[i] ? foodProduction.perProvince[i].value : 0,
+    gdpBase: gdp.perProvince[i] ? gdp.perProvince[i].base : 0,
+  }));
+  const adjusted = applyPopulationMultiplier(rawProvinces, 1);
+  const totalPopulation = adjusted.totalPopulation;
+
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp, rawProvinces, adjusted };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -164,25 +183,27 @@ function buildBioText(provinces, econ) {
     bio += `\n`;
   }
 
-  // TESTING ONLY - GDP is still being built out (currently just step 1:
-  // per-province modifier x a random econ-category base). Remove this
-  // block once the formula is confirmed correct and/or a real display
-  // format is decided on.
-  if (econ.gdp && econ.gdp.perProvince.length > 0) {
+  // TESTING ONLY - GDP is still being built out. Remove this block once
+  // the formula is confirmed correct and/or a real display format is
+  // decided on. Uses econ.adjusted (multiplier=1 here) rather than
+  // econ.gdp directly, so these numbers always match what the population
+  // slider's client-side recompute would show at "0% change".
+  if (econ.adjusted && econ.adjusted.perProvince.length > 0) {
     bio += `[Testing] Per-province GDP breakdown:\n`;
-    econ.gdp.perProvince.forEach(entry => {
-      bio += `${entry.label} (${entry.econ}): modifier ${entry.modifier.toFixed(4)} \u00d7 base ${formatCurrency(entry.base)} = ${formatCurrency(entry.gdp)}\n`;
+    econ.adjusted.perProvince.forEach(entry => {
+      bio += `${entry.label} (${entry.econ}): ${formatCurrency(entry.gdp)}\n`;
     });
-    bio += `Total GDP: ${formatCurrency(econ.gdp.total)}\n\n`;
+    bio += `\n%%FIELD%%Total GDP|${formatCurrency(econ.adjusted.totalGDP)}\n\n`;
   }
 
   bio += `## Resources & Production\n\n`;
   bio += `*(Resources haven't been filled in yet - add them here or in the BBC code before submitting.)*\n\n`;
-  bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.energyProduction.total)}\n\n`;
-  bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.foodProduction.total)}\n\n`;
+  bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.adjusted.totalEnergy)}\n\n`;
+  bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.adjusted.totalFood)}\n\n`;
 
   bio += `## Stable Population\n\n`;
   bio += `%%FIELD%%Population|${formatNumber(econ.totalPopulation)}\n\n`;
+  bio += `%%POPCONTROL%%\n\n`;
 
   bio += `Claimed provinces: ${provinceList}.`;
 
@@ -335,8 +356,8 @@ function buildBBCCode(provinces, econ) {
     .replace("{{EXPORT_4}}", exports[3])
     .replace("{{EXPORT_5}}", exports[4])
     .replace("{{POPULATION}}", formatNumber(econ.totalPopulation))
-    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total))
-    .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.foodProduction.total));
+    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.adjusted.totalEnergy))
+    .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.adjusted.totalFood));
 }
 
 // ---- climate reference data ----
@@ -679,6 +700,80 @@ function formatCurrency(n) {
   return "$" + formatNumber(Math.round(n));
 }
 
+// ---- population adjustment (the "change your population" slider) ----
+//
+// Single source of truth for turning raw per-province data into the
+// Population / Energy Production / Food Production / GDP figures shown
+// on the page, at whatever population level the player has chosen. Used
+// twice: once here at generation time (always called with multiplier=1,
+// i.e. "0% change" - the player's stable population, exactly matching
+// every figure this file already computed before this feature existed),
+// and again client-side in the bio page's own <script> block every time
+// the player picks a different population level - map.js embeds this
+// exact function via .toString() rather than reimplementing it, so the
+// two can never drift apart. That's also why it's written with no
+// references to anything outside its own parameters/body.
+//
+// Calibration (no exact numbers were specified, so these are my own
+// starting point - flag if they don't feel right):
+//   - Population increase (multiplier > 1): Energy/Food Production lose
+//     an exponentially-growing "consumption" amount, scaled to that
+//     province's own adjusted population. Zero at multiplier=1.
+//   - Population decrease (multiplier < 1): Energy/Food Production drop
+//     by a mild LINEAR penalty (workforce effect), scaled the same way.
+//     Zero at multiplier=1.
+//   - GDP always uses the adjusted population directly in its modifier
+//     (already linear in the existing formula), so it moves up or down
+//     with population automatically, no separate coefficient needed.
+function applyPopulationMultiplier(rawProvinces, multiplier) {
+  const delta = multiplier - 1;
+  const CONSUMPTION_BASE_RATE = 10;
+  const CONSUMPTION_EXPONENT = 2;
+  const PRODUCTION_DECREASE_RATE = 5;
+
+  let totalPopulation = 0, totalEnergy = 0, totalFood = 0, totalGDP = 0;
+  const perProvince = rawProvinces.map(function(p) {
+    const adjustedPop = Math.round(p.basePopulation * multiplier);
+
+    let energyValue = p.energyRaw;
+    let foodValue = p.foodRaw;
+    if (delta < 0) {
+      // A subtractive penalty, not a multiplicative one - multiplying by a
+      // factor<1 would make an already-negative value LESS negative (i.e.
+      // improve it), which is backwards for provinces that are net
+      // consumers rather than net producers. Subtracting a small amount
+      // scaled to this province's own adjusted population instead pushes
+      // the value down regardless of its starting sign, consistently
+      // matching "production should also decrease slightly."
+      const workforcePenalty = (adjustedPop / 4500000) * PRODUCTION_DECREASE_RATE * Math.abs(delta);
+      energyValue = p.energyRaw - workforcePenalty;
+      foodValue = p.foodRaw - workforcePenalty;
+    } else if (delta > 0) {
+      const consumption = (adjustedPop / 4500000) * CONSUMPTION_BASE_RATE * Math.pow(delta, CONSUMPTION_EXPONENT);
+      energyValue = p.energyRaw - consumption;
+      foodValue = p.foodRaw - consumption;
+    }
+
+    const modifier = (foodValue / 20) + Math.abs(energyValue / 10) + (adjustedPop / 4500000);
+    const gdp = Math.round(p.gdpBase * modifier);
+
+    totalPopulation += adjustedPop;
+    totalEnergy += energyValue;
+    totalFood += foodValue;
+    totalGDP += gdp;
+
+    return { label: p.label, econ: p.econ, adjustedPop: adjustedPop, energyValue: energyValue, foodValue: foodValue, gdp: gdp };
+  });
+
+  return {
+    totalPopulation: totalPopulation,
+    totalEnergy: Math.round(totalEnergy),
+    totalFood: Math.round(totalFood) - 20 * rawProvinces.length,
+    totalGDP: totalGDP,
+    perProvince: perProvince,
+  };
+}
+
 // Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
 // percentages (integers) for a single province's econ category, or null if
 // the category isn't recognized. Services + Manufacturing + Extraction sum
@@ -1002,6 +1097,19 @@ function describeClimate(name) {
 
 // Expose globally so map.js can call it without a module bundler.
 window.generateLandBio = generateLandBio;
+
+// Exposed so map.js can embed their EXACT source (via .toString()) into
+// the bio page's own <script>, for the population-adjustment control to
+// call client-side - guarantees the client-side copy can never drift
+// from the one used here at generation time, since it's the same code.
+window.applyPopulationMultiplier = applyPopulationMultiplier;
+window.formatNumber = formatNumber;
+window.formatSigned = formatSigned;
+window.energyStatusLabel = energyStatusLabel;
+window.formatEnergyProduction = formatEnergyProduction;
+window.foodClassification = foodClassification;
+window.formatFoodProduction = formatFoodProduction;
+window.formatCurrency = formatCurrency;
 
 /*
  * NOTE ON ASYNC / AI-GENERATED BIOS
