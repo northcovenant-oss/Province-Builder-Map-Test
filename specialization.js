@@ -22,7 +22,17 @@
   specApp.hidden = false;
 
   // ---- populate the read-only snapshot header ----
-  document.getElementById('snapNation').textContent = snapshot.nation || 'Unnamed Nation';
+  // Nation is entered on Step 5 now (grouped with Capital/Classification/
+  // Government Type), not on the bio page - snapshot.nation is only used
+  // as a pre-fill fallback for old snapshots that still have it. The
+  // header stays live-updated as the player types it in on Step 5.
+  const identityNationEl = document.getElementById('identityNation');
+  if(snapshot.nation) identityNationEl.value = snapshot.nation;
+  function updateNationHeader(){
+    document.getElementById('snapNation').textContent = identityNationEl.value.trim() || 'Unnamed Nation';
+  }
+  updateNationHeader();
+  identityNationEl.addEventListener('input', updateNationHeader);
   document.getElementById('snapEconomy').textContent = snapshot.economyType || '\u2014';
   document.getElementById('snapPopulation').textContent = snapshot.population || '\u2014';
   document.getElementById('snapGDP').textContent = snapshot.gdp || '\u2014';
@@ -488,9 +498,10 @@
     const airForce = String(focusValues['Air Force'] || 0);
     const expeditionary = String(focusValues['Expeditionary Forces'] || 0);
     const paramilitary = String(focusValues['Paramilitary / Militia / Gendarmes / Reserves'] || 0);
+    const nationName = document.getElementById('identityNation').value.trim();
 
     const card = CITIZEN_CARD_TEMPLATE
-      .replace('{{NATION}}', snapshot.nation || 'Nation')
+      .replace('{{NATION}}', nationName || 'Nation')
       .replace('{{JOIN_DATE}}', todayJoinDate())
       .replace('{{CLASSIFICATION}}', document.getElementById('identityClassification').value.trim())
       .replace('{{CAPITAL}}', document.getElementById('identityCapital').value.trim())
@@ -513,7 +524,7 @@
     // the sheet/form itself on submission), for whoever enters this
     // claim's data into it - the player, or the admin team.
     const adminInfo = [
-      'Nation: ' + (snapshot.nation || ''),
+      'Nation: ' + nationName,
       'Landbio Economy: ' + (snapshot.economyType || ''),
       'GDP: ' + (snapshot.gdp || ''),
       'Food Production: ' + (snapshot.foodProduction || ''),
@@ -636,7 +647,7 @@
     document.getElementById('summaryPopLevel').textContent = (pct >= 0 ? '+' : '') + pct + '%' + (pct === 0 ? ' (Stable)' : '');
     const identityBits = [
       document.getElementById('identityClassification').value.trim(),
-      snapshot.nation,
+      document.getElementById('identityNation').value.trim(),
     ].filter(Boolean).join(' ');
     const capitalBit = document.getElementById('identityCapital').value.trim();
     const govBit = document.getElementById('identityGovernment').value.trim();

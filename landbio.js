@@ -139,8 +139,7 @@ function buildBioText(provinces, econ) {
       `Heavy Industry:${t.HeavyIndustry}%|Extraction:${t.Extraction}%\n\n`;
 
     const classification = econ.classification;
-    bio += `%%FIELD%%Economy Type|${classification.name}` +
-      (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `\n\n`;
+    bio += `%%FIELD%%Economy Type|${classification.name}\n\n`;
     const desc = ECONOMY_DESCRIPTIONS[classification.name];
     if (desc) bio += `%%COLLAPSE%%Economy Description|${desc}\n\n`;
 

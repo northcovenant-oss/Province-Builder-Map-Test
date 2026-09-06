@@ -556,10 +556,6 @@
       '  .bio-card{ max-width:680px; margin:0 auto; background: var(--panel-bg); border:1px solid var(--line); border-radius:6px; padding:36px 40px; box-shadow:0 8px 28px rgba(0,0,0,0.2); }\n' +
       '  .bio-card h1{ font-family:var(--font-display); color:var(--ink); margin:0 0 4px; font-size:24px; }\n' +
       '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
-      '  .nation-field{ margin-bottom:22px; }\n' +
-      '  .nation-field label{ display:block; font-family:var(--font-display); font-size:12px; letter-spacing:0.4px; color:var(--ink-soft); margin-bottom:6px; }\n' +
-      '  .nation-field input{ width:100%; box-sizing:border-box; font-family:var(--font-body); font-size:14px; padding:9px 12px; border:1px solid var(--line); border-radius:4px; background:rgba(255,255,255,0.4); color:var(--ink); }\n' +
-      '  .nation-field input:focus{ outline:none; border-color:var(--gold); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
       '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.4px; color:var(--ink); margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line); text-transform:uppercase; }\n' +
@@ -603,10 +599,6 @@
       '  <div class="bio-card">\n' +
       '    <h1>Land Bio</h1>\n' +
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
-      (loading ? '' : '    <div class="nation-field">\n' +
-        '      <label for="nationName">NationStates Nation</label>\n' +
-        '      <input type="text" id="nationName" placeholder="e.g. Astoria" autocomplete="off">\n' +
-        '    </div>\n') +
       mapHtml +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
       (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button>' +
@@ -619,16 +611,6 @@
       '    </div>\n' +
       '  </div>\n' +
       '  <script>\n' +
-      '    var nationInput = document.getElementById("nationName");\n' +
-      '    if(nationInput){\n' +
-      '      try {\n' +
-      '        var savedName = localStorage.getItem("landClaimNationName");\n' +
-      '        if(savedName) nationInput.value = savedName;\n' +
-      '      } catch(e){}\n' +
-      '      nationInput.addEventListener("input", function(){\n' +
-      '        try { localStorage.setItem("landClaimNationName", nationInput.value); } catch(e){}\n' +
-      '      });\n' +
-      '    }\n' +
       '    function bindCopyButton(btnId, getText, label){\n' +
       '      var btn = document.getElementById(btnId);\n' +
       '      if(!btn) return;\n' +
@@ -653,10 +635,7 @@
       '    }\n' +
       '    bindCopyButton("copyClaimBtn", function(){ return document.getElementById("claimCodeValue").textContent; }, "Copy Claim Code");\n' +
       '    bindCopyButton("copyBbcBtn", function(){\n' +
-      '      var raw = document.getElementById("bbcSource").value;\n' +
-      '      var name = nationInput ? nationInput.value.trim() : "";\n' +
-      '      if(name){ raw = raw.replace("[nation][/nation]", "[nation]" + name + "[/nation]"); }\n' +
-      '      return raw;\n' +
+      '      return document.getElementById("bbcSource").value;\n' +
       '    }, "Copy BBC Code");\n' +
       '    var continueBtn = document.getElementById("continueToSpecBtn");\n' +
       '    if(continueBtn){\n' +
@@ -684,7 +663,6 @@
       '          return [];\n' +
       '        }\n' +
       '        var snapshot = {\n' +
-      '          nation: nationInput ? nationInput.value.trim() : "",\n' +
       '          economyType: fieldValue("Economy Type"),\n' +
       '          population: fieldValue("Population"),\n' +
       '          gdp: fieldValue("Total GDP"),\n' +
