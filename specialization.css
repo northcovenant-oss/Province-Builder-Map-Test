@@ -147,8 +147,18 @@ body.spec-page {
   margin: 0 0 16px;
 }
 
-#randomizeSpecsBtn, #standardSetupBtn {
+.quick-fill-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
   margin-bottom: 16px;
+}
+.quick-fill-note {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-soft);
 }
 
 .spec-count {

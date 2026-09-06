@@ -177,8 +177,21 @@
   // leaving it unfilled.
   const EXCLUDED_RANDOM_STATES = ['Balanced Market', 'Saturated Market', 'Oversaturated Market'];
   document.getElementById('randomizeSpecsBtn').addEventListener('click', function(){
+    // Full reroll every time - clears whatever's currently chosen (even
+    // manual picks) first, so clicking again actually changes the result
+    // instead of only filling in whatever's still blank.
+    for(let r = 0; r < 5; r++){ chosenSpecs[r] = null; }
+    specSlotsEl.querySelectorAll('input[type="radio"]').forEach(function(radio){
+      radio.checked = false;
+      radio.disabled = false;
+      radio.closest('.spec-option').classList.remove('disabled');
+    });
+    specSlotsEl.querySelectorAll('.spec-slot-status').forEach(function(status){
+      status.textContent = 'Not yet chosen';
+      status.classList.remove('filled');
+    });
+
     for(let rank = 0; rank < 5; rank++){
-      if(chosenSpecs[rank]) continue; // don't disturb a slot the player already filled in
       const poolNames = poolsForExportLabel(worldExports[rank]);
       let candidates = [];
       poolNames.forEach(function(poolName){
@@ -200,6 +213,7 @@
         radio.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
+    updateNextButtonState();
   });
 
   // Once a specialization is picked for one rank, it's disabled in every
@@ -389,6 +403,15 @@
     updateNextButtonState();
   });
 
+  // A second "Next" sitting right next to "Use Standard Setup," so
+  // picking the preset doesn't require scrolling all the way back down
+  // to the bottom nav to move on - it just clicks the real Next button,
+  // so it always follows the same validation/step logic (and stays
+  // disabled/enabled in sync with it - see updateNextButtonState).
+  document.getElementById('standardSetupNextBtn').addEventListener('click', function(){
+    nextBtn.click();
+  });
+
   // ---- Step 3: show chosen specializations for reference ----
   function renderChosenSummary(){
     const el = document.getElementById('chosenSummary');
@@ -421,6 +444,8 @@
       enabled = doctrineChosen && focusComplete;
     }
     nextBtn.disabled = !enabled;
+    const standardSetupNextBtn = document.getElementById('standardSetupNextBtn');
+    if(standardSetupNextBtn) standardSetupNextBtn.disabled = !enabled;
   }
 
   function showStep(step){

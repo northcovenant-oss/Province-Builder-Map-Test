@@ -56,14 +56,21 @@
       <p class="step-intro">Your five specializations are tied to your land bio's World Exports ranking (Economy
         Type: <strong id="step1EconomyType">&mdash;</strong>). For each rank, choose the specific specialty your
         nation is known for within that category.</p>
-      <button type="button" class="btn-secondary" id="randomizeSpecsBtn">Randomize (avoid crowded markets)</button>
+      <div class="quick-fill-row">
+        <button type="button" class="btn-secondary" id="randomizeSpecsBtn">Randomize (avoid crowded markets)</button>
+        <span class="quick-fill-note">Not interested? Click here to generate</span>
+      </div>
       <div id="specSlots"><!-- populated by specialization.js, one section per export rank --></div>
     </div>
 
     <!-- ===== Step 2: Military Doctrine + Focus ===== -->
     <div class="spec-card step-panel" id="step2" data-step-panel="2" hidden>
       <h2>Step 2 &middot; Military</h2>
-      <button type="button" class="btn-secondary" id="standardSetupBtn">Use Standard Setup</button>
+      <div class="quick-fill-row">
+        <button type="button" class="btn-secondary" id="standardSetupBtn">Use Standard Setup</button>
+        <button type="button" class="btn-primary" id="standardSetupNextBtn">Next &rarr;</button>
+        <span class="quick-fill-note">Not interested? Click here to generate</span>
+      </div>
 
       <h3 class="mil-subheading">Military Doctrine</h3>
 
