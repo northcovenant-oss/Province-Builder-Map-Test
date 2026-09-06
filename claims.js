@@ -1,25 +1,22 @@
 /*
  * CLAIMS LOADER
  * -------------
- * Shared by both index.html (to grey out/lock already-claimed provinces)
- * and admin.html (to see what's already on record before adding more).
+ * Used by index.html to grey out/lock already-claimed provinces on the map.
  *
  * Reads live from the community's "Rylet Land Bio Data" Google Sheet, FR
  * (Form Responses) tab - column B holds the nation name, column T holds
  * the claim code, one row per submission. This replaces the previous
- * static claims.json approach: a claim becomes visible to everyone the
- * moment it's submitted to the sheet, with no file to push and no
- * redeploy to wait on.
+ * static claims.json approach (and the Admin Page that maintained it,
+ * both retired): a claim becomes visible to everyone the moment it's
+ * submitted to the sheet, with no file to push and no redeploy to wait on.
  *
- * Each claim record returned looks the same as before, so nothing
- * downstream (map.js, admin.js) needed to change:
+ * Each claim record returned looks like:
  *   { id: "row-4", name: "Astoria", provinces: ["S9","S12","N4"], capital: "S9", dateAdded: "..." }
  *
  * `capital` is the label of one of the entries in `provinces`, or null if
  * no capital was marked - a trailing "*" on a label in the sheet's Claim
  * Code column marks it, the same convention the bio page's own Claim
- * Code box and the Admin Page use, so a code copied from any of those
- * parses identically here.
+ * Code box uses, so a code copied from there parses identically here.
  *
  * NOTE: this fetches a public URL from the browser at page-load time: I
  * couldn't run a live end-to-end test of this exact call from a real

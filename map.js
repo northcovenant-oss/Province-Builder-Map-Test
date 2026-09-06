@@ -93,14 +93,14 @@
   const byLabel = {};
   PROVINCES.forEach(function(p){ byLabel[p.label.toUpperCase()] = p; });
 
-  // ---- Already-claimed provinces (from claims.json via the Admin Page) ----
+  // ---- Already-claimed provinces (live from the community's claims sheet) ----
   // takenIndex maps a province's uppercase label -> the claim record that
   // owns it. Loaded async on startup; the map renders normally until this
   // resolves, then locks whichever provinces turn out to be taken.
   //
   // claimsEnabled is a separate on/off switch (the "Existing Claims" toggle
   // in the top-right corner) for previewing the map as if no claims were
-  // recorded yet, without touching claims.json itself. Defaults to on and
+  // recorded yet, without touching the underlying sheet. Defaults to on and
   // persists per-browser via localStorage, same pattern as the theme choice.
   const CLAIMS_TOGGLE_KEY = 'landClaimClaimsEnabled';
   let takenIndex = {};

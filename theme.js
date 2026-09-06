@@ -67,9 +67,9 @@
     });
   });
 
-  // Pages without the Appearance dropdown (e.g. admin.html) still get the
-  // saved theme applied to <body> above; they just skip the UI wiring below,
-  // since there's nothing in the DOM for it to attach to.
+  // Pages without the Appearance dropdown (e.g. specialization.html) still
+  // get the saved theme applied to <body> above; they just skip the UI
+  // wiring below, since there's nothing in the DOM for it to attach to.
   if (hasDropdownUI) {
     toggleBtn.addEventListener('click', function(e){
       e.stopPropagation();
