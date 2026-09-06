@@ -482,11 +482,6 @@
     return div.innerHTML;
   }
 
-  // -90% to +120% in 30% steps - the range and increment the population
-  // control offers.
-  const POP_CONTROL_OPTIONS = [];
-  for(let pct = -90; pct <= 120; pct += 30){ POP_CONTROL_OPTIONS.push({ pct: pct }); }
-
   function writeBioPage(targetWindow, provinces, result, loading){
     const themeClass = Array.from(document.body.classList).find(function(c){ return c.indexOf('theme-') === 0; }) || '';
     const provinceList = provinces.map(function(p){ return p.label + (p.isCapital ? ' \u2605' : ''); }).join(', ');
@@ -507,20 +502,6 @@
           if(placeholderMatch){
             return '<p class="bio-placeholder">' + escapeHtml(placeholderMatch[1]) + '</p>';
           }
-          // "%%POPCONTROL%%" -> the interactive population-adjustment
-          // control. Wiring for it (reading rawProvinces + calling
-          // applyPopulationMultiplier) is added separately, after this
-          // HTML is built - see the <script> built further down.
-          if(para.trim() === '%%POPCONTROL%%'){
-            return '<div class="pop-control">' +
-              '<label for="popAdjust">Adjust population (for testing)</label>' +
-              '<select id="popAdjust">' +
-              POP_CONTROL_OPTIONS.map(function(opt){
-                return '<option value="' + opt.pct + '"' + (opt.pct === 0 ? ' selected' : '') + '>' +
-                  (opt.pct > 0 ? '+' : '') + opt.pct + '%' + (opt.pct === 0 ? ' (Stable)' : '') + '</option>';
-              }).join('') +
-              '</select></div>';
-          }
           // "%%FIELD%%Label|Value" -> a labeled field, matching the BBC
           // code's "[u]Label[/u]: value" lines (e.g. "Economy Type:").
           // Values that are plain URLs (the External Link field) render as
@@ -532,7 +513,7 @@
             const valueHtml = isUrl
               ? '<a href="' + escapeHtml(value.trim()) + '" target="_blank" rel="noopener">' + escapeHtml(value.trim()) + '</a>'
               : escapeHtml(value);
-            return '<p class="bio-field" data-field="' + escapeHtml(parts[0]) + '"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
+            return '<p class="bio-field"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
               '<span class="bio-field-value">' + valueHtml + '</span></p>';
           }
           // "%%TABLE%%Heading|Label1:Val1|Label2:Val2|..." -> a labeled
@@ -577,9 +558,6 @@
       '  .bio-field-label{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--ink-soft); margin-right:2px; }\n' +
       '  .bio-field-value{ font-style:italic; font-weight:600; }\n' +
       '  .bio-field-value a{ color:var(--gold); word-break:break-all; }\n' +
-      '  .pop-control{ display:flex; align-items:center; gap:10px; margin:0 0 16px; padding:10px 12px; background:rgba(0,0,0,0.03); border:1px dashed var(--line); border-radius:4px; }\n' +
-      '  .pop-control label{ font-family:var(--font-display); font-size:12px; letter-spacing:0.3px; color:var(--ink-soft); }\n' +
-      '  .pop-control select{ font-family:var(--font-body); font-size:13.5px; padding:5px 8px; border:1px solid var(--line); border-radius:3px; background:var(--panel-bg); color:var(--ink); }\n' +
       '  .bio-export-table{ width:100%; border-collapse:collapse; margin:6px 0 14px; font-family:var(--font-body); font-size:13.5px; }\n' +
       '  .bio-export-table th{ font-family:var(--font-display); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--ink-soft); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); }\n' +
       '  .bio-export-table td{ padding:8px 10px; color:var(--ink); border-bottom:1px solid var(--line); vertical-align:top; }\n' +
@@ -615,7 +593,8 @@
         '    </div>\n') +
       mapHtml +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
-      (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
+      (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button>' +
+                       '<button id="continueToSpecBtn">Continue to National Specialization &rarr;</button></div>\n' +
                        '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n') +
       '    <div class="claim-code-block">\n' +
       '      <div class="cc-title">Claim Code &mdash; paste this into "Load a Claim Code" on the map to recreate this exact selection</div>\n' +
@@ -663,33 +642,32 @@
       '      if(name){ raw = raw.replace("[nation][/nation]", "[nation]" + name + "[/nation]"); }\n' +
       '      return raw;\n' +
       '    }, "Copy BBC Code");\n' +
-      (loading ? '' :
-      '    var __rawProvinces = ' + JSON.stringify((result && result.rawProvinces) || []) + ';\n' +
-      '    ' + window.applyPopulationMultiplier.toString() + '\n' +
-      '    ' + window.formatNumber.toString() + '\n' +
-      '    ' + window.formatSigned.toString() + '\n' +
-      '    ' + window.energyStatusLabel.toString() + '\n' +
-      '    ' + window.formatEnergyProduction.toString() + '\n' +
-      '    ' + window.foodClassification.toString() + '\n' +
-      '    ' + window.formatFoodProduction.toString() + '\n' +
-      '    ' + window.formatCurrency.toString() + '\n' +
-      '    var popSelect = document.getElementById("popAdjust");\n' +
-      '    if(popSelect){\n' +
-      '      popSelect.addEventListener("change", function(){\n' +
-      '        var pct = parseInt(popSelect.value, 10);\n' +
-      '        var multiplier = 1 + (pct / 100);\n' +
-      '        var adjusted = applyPopulationMultiplier(__rawProvinces, multiplier);\n' +
-      '        function setField(name, text){\n' +
-      '          var el = document.querySelector(\'[data-field="\' + name + \'"] .bio-field-value\');\n' +
-      '          if(el) el.textContent = text;\n' +
+      '    var continueBtn = document.getElementById("continueToSpecBtn");\n' +
+      '    if(continueBtn){\n' +
+      '      continueBtn.addEventListener("click", function(){\n' +
+      '        function fieldValue(label){\n' +
+      '          var fields = document.querySelectorAll(".bio-field");\n' +
+      '          for(var i=0;i<fields.length;i++){\n' +
+      '            var labelEl = fields[i].querySelector(".bio-field-label");\n' +
+      '            var valueEl = fields[i].querySelector(".bio-field-value");\n' +
+      '            if(labelEl && valueEl && labelEl.textContent.replace(/:$/,"") === label) return valueEl.textContent;\n' +
+      '          }\n' +
+      '          return "";\n' +
       '        }\n' +
-      '        setField("Population", formatNumber(adjusted.totalPopulation));\n' +
-      '        setField("Energy Production", formatEnergyProduction(adjusted.totalEnergy));\n' +
-      '        setField("Food Production", formatFoodProduction(adjusted.totalFood));\n' +
-      '        setField("Total GDP", formatCurrency(adjusted.totalGDP));\n' +
+      '        var snapshot = {\n' +
+      '          nation: nationInput ? nationInput.value.trim() : "",\n' +
+      '          economyType: fieldValue("Economy Type"),\n' +
+      '          population: fieldValue("Population"),\n' +
+      '          gdp: fieldValue("Total GDP"),\n' +
+      '          energyProduction: fieldValue("Energy Production"),\n' +
+      '          foodProduction: fieldValue("Food Production"),\n' +
+      '        };\n' +
+      '        try {\n' +
+      '          localStorage.setItem("landClaimSpecializationSnapshot", JSON.stringify(snapshot));\n' +
+      '        } catch(e){}\n' +
+      '        window.open("specialization.html", "_blank");\n' +
       '      });\n' +
-      '    }\n'
-      ) +
+      '    }\n' +
       '  <\/script>\n' +
       '</body>\n</html>';
 

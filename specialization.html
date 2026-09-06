@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>National Specialization</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="specialization.css">
+</head>
+<body class="spec-page">
+
+<div class="spec-wrap">
+
+  <div class="spec-header">
+    <h1>National Specialization</h1>
+    <p class="spec-sub">Step 2 of your land claim - choose how your nation's economy and military take shape.</p>
+  </div>
+
+  <!-- Shown only if no snapshot was found (bio page wasn't visited, or
+       "Continue" was never clicked there). -->
+  <div class="spec-card spec-empty-state" id="noSnapshotCard" hidden>
+    <p>We don't have a claim to work from yet. Go generate a land bio first, then use the
+      <strong>"Continue to National Specialization"</strong> button there to come back here.</p>
+    <a class="btn-secondary" href="index.html">&larr; Back to map</a>
+  </div>
+
+  <div id="specApp" hidden>
+    <!-- Pulled-in snapshot data from the land bio: nation, economy type,
+         food/energy production, population, GDP. Read-only here - this
+         page builds on top of these, it doesn't change them. -->
+    <div class="spec-card spec-snapshot">
+      <div class="snapshot-grid">
+        <div class="snapshot-item"><span class="snapshot-label">Nation</span><span class="snapshot-value" id="snapNation">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">Economy Type</span><span class="snapshot-value" id="snapEconomy">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">Population</span><span class="snapshot-value" id="snapPopulation">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">GDP</span><span class="snapshot-value" id="snapGDP">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">Energy Production</span><span class="snapshot-value" id="snapEnergy">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">Food Production</span><span class="snapshot-value" id="snapFood">&mdash;</span></div>
+      </div>
+    </div>
+
+    <!-- Step progress indicator -->
+    <div class="spec-steps" id="stepIndicator">
+      <div class="step-dot active" data-step="1"><span class="step-num">1</span><span class="step-label">Specializations</span></div>
+      <div class="step-connector"></div>
+      <div class="step-dot" data-step="2"><span class="step-num">2</span><span class="step-label">Military</span></div>
+      <div class="step-connector"></div>
+      <div class="step-dot" data-step="3"><span class="step-num">3</span><span class="step-label">Production</span></div>
+      <div class="step-connector"></div>
+      <div class="step-dot" data-step="4"><span class="step-num">4</span><span class="step-label">Population</span></div>
+    </div>
+
+    <!-- ===== Step 1: Choose 5 Specializations ===== -->
+    <div class="spec-card step-panel" id="step1" data-step-panel="1">
+      <h2>Step 1 &middot; Choose 5 Specializations</h2>
+      <p class="step-intro">Based on your economy type (<strong id="step1EconomyType">&mdash;</strong>), pick exactly
+        <strong>5</strong> specializations your nation is known for.</p>
+      <div class="spec-count"><span id="specCount">0</span> / 5 selected</div>
+      <div class="spec-options" id="specOptions"><!-- populated by specialization.js --></div>
+    </div>
+
+    <!-- ===== Step 2: Military Specialization ===== -->
+    <div class="spec-card step-panel" id="step2" data-step-panel="2" hidden>
+      <h2>Step 2 &middot; Military Specialization</h2>
+      <p class="step-intro">Choose the one area of defense manufacturing your nation is most known for.</p>
+      <div class="spec-options single-select" id="militaryOptions"><!-- populated by specialization.js --></div>
+    </div>
+
+    <!-- ===== Step 3: Adjust Energy/Agricultural Production ===== -->
+    <div class="spec-card step-panel" id="step3" data-step-panel="3" hidden>
+      <h2>Step 3 &middot; Adjust Energy &amp; Agricultural Production</h2>
+      <p class="step-intro">Your chosen specializations may let you shift these figures. This step is a placeholder for now - no formulas are wired up yet.</p>
+      <div class="spec-chosen-summary" id="chosenSummary"><!-- populated by specialization.js --></div>
+      <div class="adjust-row">
+        <div class="adjust-field">
+          <label>Energy Production</label>
+          <div class="adjust-controls">
+            <button class="adjust-btn" disabled>&minus;</button>
+            <span class="adjust-value" id="adjEnergyValue">&mdash;</span>
+            <button class="adjust-btn" disabled>+</button>
+          </div>
+        </div>
+        <div class="adjust-field">
+          <label>Food Production</label>
+          <div class="adjust-controls">
+            <button class="adjust-btn" disabled>&minus;</button>
+            <span class="adjust-value" id="adjFoodValue">&mdash;</span>
+            <button class="adjust-btn" disabled>+</button>
+          </div>
+        </div>
+      </div>
+      <p class="spec-placeholder-note">(Adjustment formulas based on your chosen specializations will go here.)</p>
+    </div>
+
+    <!-- ===== Step 4: Adjust Population ===== -->
+    <div class="spec-card step-panel" id="step4" data-step-panel="4" hidden>
+      <h2>Step 4 &middot; Adjust Population</h2>
+      <p class="step-intro">Choosing a population level away from your stable population will affect Energy
+        Production, Food Production, and GDP. This step is a placeholder for now - no formulas are wired up yet.</p>
+      <div class="pop-adjust-row">
+        <label for="specPopAdjust">Population level</label>
+        <select id="specPopAdjust">
+          <option value="-90">-90%</option>
+          <option value="-60">-60%</option>
+          <option value="-30">-30%</option>
+          <option value="0" selected>0% (Stable)</option>
+          <option value="30">+30%</option>
+          <option value="60">+60%</option>
+          <option value="90">+90%</option>
+          <option value="120">+120%</option>
+        </select>
+      </div>
+      <p class="spec-placeholder-note">(Population-adjustment formulas will go here.)</p>
+    </div>
+
+    <!-- ===== Final summary, shown after Step 4 ===== -->
+    <div class="spec-card step-panel" id="stepSummary" data-step-panel="summary" hidden>
+      <h2>Summary</h2>
+      <div class="summary-block">
+        <div class="summary-label">Chosen Specializations</div>
+        <div id="summarySpecs">&mdash;</div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">Military Specialization</div>
+        <div id="summaryMilitary">&mdash;</div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">Population Level</div>
+        <div id="summaryPopLevel">&mdash;</div>
+      </div>
+      <p class="spec-placeholder-note">This is as far as the skeleton goes for now - nothing here is saved yet.</p>
+    </div>
+
+    <div class="spec-nav">
+      <button class="btn-secondary" id="backBtn" hidden>&larr; Back</button>
+      <button class="btn-primary" id="nextBtn">Next &rarr;</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="specialization-data.js"></script>
+<script src="specialization.js"></script>
+<script src="theme.js"></script>
+</body>
+</html>
