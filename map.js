@@ -558,21 +558,21 @@
       '  .bio-card .meta{ font-family:var(--font-body); font-size:12.5px; font-style:italic; color:var(--ink-soft); margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }\n' +
       '  .bio-card p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0 0 14px; }\n' +
       '  .bio-loading{ font-style:italic; color:var(--ink-soft); }\n' +
-      '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.4px; color:var(--ink); margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line); text-transform:uppercase; }\n' +
-      '  .bio-section:first-of-type{ margin-top:18px; }\n' +
+      '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.5px; color:var(--gold); margin:30px 0 12px; padding-top:18px; border-top:2px solid var(--gold); text-transform:uppercase; }\n' +
+      '  .bio-section:first-of-type{ margin-top:20px; }\n' +
       '  .bio-placeholder{ font-family:var(--font-body); font-style:italic; font-size:14px; color:var(--ink-soft); background:rgba(0,0,0,0.03); border:1px dashed var(--line); border-radius:4px; padding:10px 12px; margin:0 0 14px; }\n' +
-      '  .bio-collapse{ margin:0 0 14px; }\n' +
+      '  .bio-collapse{ margin:0 0 16px; }\n' +
       '  .bio-collapse summary{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--gold); cursor:pointer; user-select:none; padding:2px 0; }\n' +
       '  .bio-collapse summary:hover{ text-decoration:underline; }\n' +
       '  .bio-collapse[open] summary{ margin-bottom:6px; }\n' +
       '  .bio-collapse p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0; }\n' +
-      '  .bio-field{ font-family:var(--font-body); font-size:16px; line-height:1.6; color:var(--ink); margin:0 0 4px; }\n' +
+      '  .bio-field{ font-family:var(--font-body); font-size:16px; line-height:1.65; color:var(--ink); margin:0 0 10px; }\n' +
       '  .bio-field-label{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--ink-soft); margin-right:2px; }\n' +
       '  .bio-field-value{ font-style:italic; font-weight:600; }\n' +
       '  .bio-field-value a{ color:var(--gold); word-break:break-all; }\n' +
-      '  .bio-export-table{ width:100%; border-collapse:collapse; margin:6px 0 14px; font-family:var(--font-body); font-size:13.5px; }\n' +
-      '  .bio-export-table th{ font-family:var(--font-display); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--ink-soft); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); }\n' +
-      '  .bio-export-table td{ padding:8px 10px; color:var(--ink); border-bottom:1px solid var(--line); vertical-align:top; }\n' +
+      '  .bio-export-table{ width:100%; border-collapse:collapse; margin:8px 0 18px; font-family:var(--font-body); font-size:13.5px; }\n' +
+      '  .bio-export-table th{ font-family:var(--font-display); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--ink-soft); text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); }\n' +
+      '  .bio-export-table td{ padding:9px 10px; color:var(--ink); border-bottom:1px solid var(--line); vertical-align:top; }\n' +
       '  .bio-export-table tr:last-child td{ border-bottom:none; }\n' +
       '  .claim-map{ margin-bottom:22px; }\n' +
       '  .claim-map .map-row{ display:flex; gap:12px; flex-wrap:wrap; }\n' +
@@ -580,13 +580,15 @@
       '  .claim-map .map-shot svg{ width:100%; height:auto; display:block; }\n' +
       '  .claim-map .map-shot-label{ font-family:var(--font-display); font-size:11px; letter-spacing:0.4px; color:var(--ink-soft); text-align:center; margin-top:6px; }\n' +
       '  .bio-actions{ margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }\n' +
-      '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:10px 16px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:var(--ink); }\n' +
-      '  .bio-actions button.copied{ background:var(--gold); }\n' +
+      '  .bio-actions button{ font-family:var(--font-display); font-size:13px; letter-spacing:0.4px; padding:9px 16px; border-radius:4px; border:1px solid var(--line); cursor:pointer; background:var(--panel-bg); color:var(--ink); }\n' +
+      '  .bio-actions button.copied{ background:var(--gold); color:#fff; border-color:var(--gold); }\n' +
+      '  .bio-actions button.btn-primary{ font-weight:600; padding:11px 20px; border-color:var(--gold); background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.15); }\n' +
+      '  .bio-actions button.btn-primary.copied{ background:var(--gold); color:#fff; }\n' +
       '  .claim-code-block{ margin-top:28px; padding-top:18px; border-top:1px solid var(--line); }\n' +
       '  .claim-code-block .cc-title{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.5px; color:var(--ink-soft); margin-bottom:8px; }\n' +
       '  .claim-code-value{ font-family:var(--font-body); font-size:14px; color:var(--ink); background:rgba(0,0,0,0.04); border:1px solid var(--line); border-radius:4px; padding:10px 12px; word-break:break-word; }\n' +
-      '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--ink); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
-      '  .copy-btn.copied{ background:var(--gold); }\n' +
+      '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--line); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
+      '  .copy-btn.copied{ background:var(--gold); color:#fff; border-color:var(--gold); }\n' +
       '  #bbcSource{ position:absolute; left:-9999px; top:-9999px; }\n' +
       '  @media (max-width:480px){\n' +
       '    body.bio-page{ padding:20px 12px; }\n' +
@@ -601,8 +603,8 @@
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
       mapHtml +
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
-      (loading ? '' : '    <div class="bio-actions"><button id="copyBbcBtn">Copy BBC Code</button>' +
-                       '<button id="continueToSpecBtn">Continue to National Specialization &rarr;</button></div>\n' +
+      (loading ? '' : '    <div class="bio-actions"><button id="continueToSpecBtn" class="btn-primary">Continue to National Specialization &rarr;</button>' +
+                       '<button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
                        '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n') +
       '    <div class="claim-code-block">\n' +
       '      <div class="cc-title">Claim Code &mdash; paste this into "Load a Claim Code" on the map to recreate this exact selection</div>\n' +
