@@ -181,10 +181,10 @@
   MILITARY_BRANCHES.forEach(function(b){ focusValues[b.id] = 0; });
 
   function branchCap(branch){
-    if(!chosenStance) return branch.requiresUnlock ? 0 : branch.standardCap;
-    const raised = branch.raiseCapIf && branch.raiseCapIf(chosenPriority, chosenStance);
-    if(branch.requiresUnlock) return raised ? militaryFocusBudget(chosenStance) : 0;
-    return raised ? militaryFocusBudget(chosenStance) : branch.standardCap;
+    const raised = chosenStance && branch.raiseCapIf && branch.raiseCapIf(chosenPriority, chosenStance);
+    if(branch.requiresUnlock && !raised) return 0;
+    if(!raised) return branch.standardCap;
+    return branch.raisedCapType === 'fixed' ? raisedBranchCap(chosenPriority) : militaryFocusBudget(chosenStance);
   }
 
   function pointsSpent(){
@@ -205,19 +205,18 @@
       row.className = 'focus-branch' + (cap === 0 ? ' locked' : '');
 
       const label = document.createElement('label');
-      label.textContent = branch.id;
-      if(branch.requiresUnlock && cap === 0){
-        const note = document.createElement('span');
-        note.className = 'focus-cap-note';
-        note.textContent = ' (locked - requires Projecting or Aggressive stance)';
-        label.appendChild(note);
-      } else {
-        const note = document.createElement('span');
-        note.className = 'focus-cap-note';
-        note.textContent = ' (max ' + cap + ')';
-        label.appendChild(note);
-      }
+      label.textContent = branch.id + ' (max ' + cap + ')';
       row.appendChild(label);
+
+      // The rule explaining how to raise/unlock this branch is always
+      // shown, not just while locked - so players can see what Doctrine
+      // choices would help before committing to one.
+      if(branch.raiseDescription){
+        const rule = document.createElement('div');
+        rule.className = 'focus-rule-note';
+        rule.textContent = branch.raiseDescription;
+        row.appendChild(rule);
+      }
 
       const input = document.createElement('input');
       input.type = 'number';

@@ -253,10 +253,13 @@ body.spec-page {
   color: var(--ink);
   min-width: 220px;
 }
-.focus-cap-note {
+.focus-rule-note {
+  flex-basis: 100%;
+  font-family: var(--font-body);
   font-size: 12px;
   font-style: italic;
   color: var(--ink-soft);
+  margin: 2px 0 2px;
 }
 .focus-branch input[type="number"] {
   width: 60px;
@@ -278,6 +281,16 @@ body.spec-page {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px 16px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* Step 1 stacks 5 of these one after another, so keep each one more
+   compact than the general case above - saves space without preventing
+   the page itself from scrolling (that was a separate bug, already
+   fixed by the html,body overflow override earlier in this file). */
+.spec-slot .spec-options {
+  max-height: 180px;
 }
 @media (max-width: 560px) {
   .spec-options { grid-template-columns: 1fr; }

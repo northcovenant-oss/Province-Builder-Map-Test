@@ -172,48 +172,67 @@ function militaryFocusBudget(stance){
   return MILITARY_FOCUS_BASE_POINTS;
 }
 
-// Each branch's standard cap, an optional raised cap unlocked by specific
-// Doctrine choices, and any special allocation rule. Where the source
-// material gave a raised cap as "7+"/"8+"/"6+" without an explicit
-// ceiling, the raised cap is treated as the player's whole budget (no
-// additional per-branch ceiling beyond what they have to spend) - flagged
-// here since that's my own reading of an open-ended figure, not a given
-// number.
+// Each branch's standard (unmodified) cap, whether/how it can be raised
+// by Doctrine choices, and any special allocation rule.
+//
+// Navy/Army/Air Force share the same raised-cap structure: once their
+// unlock condition is met, the cap becomes a fixed 9 - or 11 specifically
+// for a player with Specialized priority, reflecting that "values a
+// single branch above all else" doctrine pushing further than any other
+// combination can. Expeditionary Forces and Paramilitary work
+// differently (see their own comments below).
+const MILITARY_RAISED_CAP = 9;
+const MILITARY_RAISED_CAP_SPECIALIZED = 11;
+function raisedBranchCap(priority){
+  return priority === "Specialized" ? MILITARY_RAISED_CAP_SPECIALIZED : MILITARY_RAISED_CAP;
+}
+
 const MILITARY_BRANCHES = [
   {
     id: "Navy",
-    standardCap: 5,
+    standardCap: 6,
     raiseCapIf: function(priority, stance){ return stance === "Projecting" || priority === "Specialized"; },
+    raisedCapType: "fixed",
+    raiseDescription: "Raises to 9 (11 with Specialized priority) with Projecting stance or Specialized priority.",
   },
   {
     id: "Army",
-    standardCap: 6,
+    standardCap: 7,
     raiseCapIf: function(priority, stance){ return priority === "Quantity"; },
+    raisedCapType: "fixed",
+    raiseDescription: "Raises to 9 with Quantity priority.",
   },
   {
     id: "Air Force",
-    standardCap: 4,
+    standardCap: 5,
     raiseCapIf: function(priority, stance){ return priority === "Quality" || priority === "Specialized"; },
+    raisedCapType: "fixed",
+    raiseDescription: "Raises to 9 (11 with Specialized priority) with Quality or Specialized priority.",
   },
   {
+    // No standard cap was given for this branch at all - unlike the other
+    // four, it isn't just "harder to max out," it's unavailable entirely
+    // without the right Doctrine. standardCap of 0 plus requiresUnlock
+    // models "locked out" rather than "capped low." Once unlocked, it
+    // isn't held to the fixed 9/11 ceiling above - it can use the whole
+    // points budget, since no cap was given for it at all.
     id: "Expeditionary Forces",
-    // No standard cap was given for this branch at all - unlike the
-    // other four, it isn't just "harder to max out," it's unavailable
-    // entirely without the right Doctrine. standardCap of 0 plus
-    // requiresUnlock models "locked out" rather than "capped low."
     standardCap: 0,
     requiresUnlock: true,
-    raiseCapIf: function(priority, stance){ return stance === "Projecting" || stance === "Aggressive"; },
+    raiseCapIf: function(priority, stance){ return stance === "Projecting" || stance === "Aggressive" || stance === "Combative"; },
+    raisedCapType: "budget",
+    raiseDescription: "Unlocks (up to your full points budget) with Projecting, Combative, or Aggressive stance.",
   },
   {
     id: "Paramilitary / Militia / Gendarmes",
     // Not specially capped below the total budget - always tracks
-    // whatever the current budget is (15/17/20), same as any branch
-    // whose cap is "raised." The special rule here is the levelsPerPoint
-    // conversion, not a lower ceiling.
+    // whatever the current budget is (15/17/20). The special rule here is
+    // the levelsPerPoint conversion, not a lower ceiling.
     standardCap: MILITARY_FOCUS_BASE_POINTS,
     raiseCapIf: function(){ return true; },
+    raisedCapType: "budget",
     levelsPerPoint: function(priority){ return priority === "Quality" ? 1 : 2; },
+    raiseDescription: "Not capped below your total points budget. Each point buys 2 levels of strength, or 1 with Quality priority.",
   },
 ];
 
