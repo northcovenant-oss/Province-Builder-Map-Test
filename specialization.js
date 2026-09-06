@@ -521,28 +521,29 @@
 
     // A copy-paste-ready block matching the FR (Form Responses) sheet's
     // own column order (B through T - column A/Timestamp is filled by
-    // the sheet/form itself on submission), for whoever enters this
-    // claim's data into it - the player, or the admin team.
+    // the sheet/form itself on submission). Bare values only, one per
+    // line, no labels - this goes straight into sheet cells, so a label
+    // would just be one more thing to strip out before pasting.
     const adminInfo = [
-      'Nation: ' + nationName,
-      'Landbio Economy: ' + (snapshot.economyType || ''),
-      'GDP: ' + (snapshot.gdp || ''),
-      'Food Production: ' + (snapshot.foodProduction || ''),
-      'Energy Production: ' + (snapshot.energyProduction || ''),
-      'Population: ' + (snapshot.population || ''),
-      '1st Specialization: ' + specs[0],
-      '2nd Specialization: ' + specs[1],
-      '3rd Specialization: ' + specs[2],
-      '4th Specialization: ' + specs[3],
-      '5th Specialization: ' + specs[4],
-      'Military Priority: ' + priorityText,
-      'National Stance: ' + stanceText,
-      'Navy: ' + navy,
-      'Army: ' + army,
-      'Airforce: ' + airForce,
-      'Expeditionary Forces: ' + expeditionary,
-      'Paramilitary/Militia/Gendarmes: ' + paramilitary,
-      'Claim Code: ' + (snapshot.claimCode || ''),
+      nationName,
+      snapshot.economyType || '',
+      snapshot.gdp || '',
+      snapshot.foodProduction || '',
+      snapshot.energyProduction || '',
+      snapshot.population || '',
+      specs[0],
+      specs[1],
+      specs[2],
+      specs[3],
+      specs[4],
+      priorityText,
+      stanceText,
+      navy,
+      army,
+      airForce,
+      expeditionary,
+      paramilitary,
+      snapshot.claimCode || '',
     ].join('\n');
 
     return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo + '\n[/spoiler]';
