@@ -216,6 +216,13 @@
     updateNextButtonState();
   });
 
+  // Sits right next to Randomize, same idea as standardSetupNextBtn on
+  // Step 2 - just clicks the real Next button so it always follows the
+  // same validation/step logic and stays in sync with it.
+  document.getElementById('randomizeNextBtn').addEventListener('click', function(){
+    nextBtn.click();
+  });
+
   // Once a specialization is picked for one rank, it's disabled in every
   // other rank's list - the same specialty shouldn't be both your 1st and
   // 3rd export, for example.
@@ -446,6 +453,8 @@
     nextBtn.disabled = !enabled;
     const standardSetupNextBtn = document.getElementById('standardSetupNextBtn');
     if(standardSetupNextBtn) standardSetupNextBtn.disabled = !enabled;
+    const randomizeNextBtn = document.getElementById('randomizeNextBtn');
+    if(randomizeNextBtn) randomizeNextBtn.disabled = !enabled;
   }
 
   function showStep(step){
