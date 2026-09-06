@@ -156,14 +156,50 @@
     });
   }
 
+  let lastMarketMap = null;
   fetchMarketSaturation(function(map, err){
     if(err || !map){
       marketLegendEl.innerHTML = '<span class="market-legend-label market-legend-error">' +
         'Couldn\u2019t load live market saturation data - specializations are shown without it.</span>';
       return;
     }
+    lastMarketMap = map;
     renderMarketLegend();
     applyMarketBadges(map);
+  });
+
+  // "Randomize" - fills every unfilled slot with a random pick from that
+  // slot's own pool, skipping specializations already chosen in another
+  // slot and (when market data loaded successfully) skipping Balanced/
+  // Saturated/Oversaturated markets in favor of the three less-crowded
+  // states. If filtering by market state would leave a slot with nothing
+  // to pick from, that filter is dropped for just that slot rather than
+  // leaving it unfilled.
+  const EXCLUDED_RANDOM_STATES = ['Balanced Market', 'Saturated Market', 'Oversaturated Market'];
+  document.getElementById('randomizeSpecsBtn').addEventListener('click', function(){
+    for(let rank = 0; rank < 5; rank++){
+      if(chosenSpecs[rank]) continue; // don't disturb a slot the player already filled in
+      const poolNames = poolsForExportLabel(worldExports[rank]);
+      let candidates = [];
+      poolNames.forEach(function(poolName){
+        (SPECIALIZATION_POOLS[poolName] || []).forEach(function(name){ candidates.push(name); });
+      });
+      candidates = candidates.filter(function(name){ return chosenSpecs.indexOf(name) === -1; });
+      if(lastMarketMap){
+        const lessCrowded = candidates.filter(function(name){
+          const status = lastMarketMap[name.toLowerCase()];
+          return !status || EXCLUDED_RANDOM_STATES.indexOf(status) === -1;
+        });
+        if(lessCrowded.length > 0) candidates = lessCrowded;
+      }
+      if(candidates.length === 0) continue;
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      const radio = document.getElementById(specId(rank, pick));
+      if(radio){
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
   });
 
   // Once a specialization is picked for one rank, it's disabled in every
@@ -330,6 +366,28 @@
   });
 
   renderFocusBranches();
+
+  // "Use Standard Setup" - Defensive stance, Balanced priority, and a
+  // preset point allocation (4 Navy / 5 Army / 3 Air Force / 3 Reserves)
+  // that uses the full 15-point Defensive budget without needing any
+  // raised caps, for players who just want a reasonable default.
+  document.getElementById('standardSetupBtn').addEventListener('click', function(){
+    const priorityRadio = document.getElementById('militaryPriority_Balanced');
+    const stanceRadio = document.getElementById('militaryStance_Defensive');
+    priorityRadio.checked = true;
+    chosenPriority = 'Balanced';
+    stanceRadio.checked = true;
+    chosenStance = 'Defensive';
+
+    MILITARY_BRANCHES.forEach(function(b){ focusValues[b.id] = 0; });
+    focusValues['Navy'] = 4;
+    focusValues['Army'] = 5;
+    focusValues['Air Force'] = 3;
+    focusValues['Paramilitary / Militia / Gendarmes / Reserves'] = 3;
+
+    renderFocusBranches();
+    updateNextButtonState();
+  });
 
   // ---- Step 3: show chosen specializations for reference ----
   function renderChosenSummary(){

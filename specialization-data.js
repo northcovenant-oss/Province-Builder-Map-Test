@@ -173,7 +173,8 @@ function militaryFocusBudget(stance){
   if(stance === "Pacifist") return 0;
   if(stance === "Combative" || stance === "Aggressive") return MILITARY_FOCUS_BASE_POINTS + 5;
   if(stance === "Projecting") return MILITARY_FOCUS_BASE_POINTS + 2;
-  return MILITARY_FOCUS_BASE_POINTS;
+  if(stance === "Neutral") return MILITARY_FOCUS_BASE_POINTS - 2;
+  return MILITARY_FOCUS_BASE_POINTS; // Defensive
 }
 
 // Each branch's standard (unmodified) cap, whether/how it can be raised
@@ -234,7 +235,7 @@ const MILITARY_BRANCHES = [
     raiseDescription: "Unlocks to 5 (7 with Specialized priority) with Projecting, Combative, or Aggressive stance.",
   },
   {
-    id: "Paramilitary / Militia / Gendarmes",
+    id: "Paramilitary / Militia / Gendarmes / Reserves",
     // Not specially capped below the total budget - always tracks
     // whatever the current budget is (15/17/20). The special rule here is
     // the levelsPerPoint conversion, not a lower ceiling.

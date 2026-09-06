@@ -147,6 +147,10 @@ body.spec-page {
   margin: 0 0 16px;
 }
 
+#randomizeSpecsBtn, #standardSetupBtn {
+  margin-bottom: 16px;
+}
+
 .spec-count {
   font-family: var(--font-display);
   font-size: 13px;
