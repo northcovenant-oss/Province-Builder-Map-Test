@@ -175,16 +175,24 @@ function militaryFocusBudget(stance){
 // Each branch's standard (unmodified) cap, whether/how it can be raised
 // by Doctrine choices, and any special allocation rule.
 //
-// Navy/Army/Air Force share the same raised-cap structure: once their
-// unlock condition is met, the cap becomes a fixed 9 - or 11 specifically
-// for a player with Specialized priority, reflecting that "values a
-// single branch above all else" doctrine pushing further than any other
-// combination can. Expeditionary Forces and Paramilitary work
-// differently (see their own comments below).
+// Navy/Army/Air Force share the same raised-cap numbers: once their
+// unlock condition is met, the cap becomes 9 - or 11 for a player with
+// Specialized priority, since "values a single branch above all else"
+// pushes further than any other combination can, in ANY of the three
+// (Specialized alone is always one way to unlock each of them, alongside
+// each branch's own specific condition). Expeditionary Forces uses its
+// own, lower pair (5 / 7 with Specialized) since it's a smaller force by
+// nature. Paramilitary works differently still (see its own comment).
 const MILITARY_RAISED_CAP = 9;
 const MILITARY_RAISED_CAP_SPECIALIZED = 11;
 function raisedBranchCap(priority){
   return priority === "Specialized" ? MILITARY_RAISED_CAP_SPECIALIZED : MILITARY_RAISED_CAP;
+}
+
+const EXPEDITIONARY_RAISED_CAP = 5;
+const EXPEDITIONARY_RAISED_CAP_SPECIALIZED = 7;
+function raisedExpeditionaryCap(priority){
+  return priority === "Specialized" ? EXPEDITIONARY_RAISED_CAP_SPECIALIZED : EXPEDITIONARY_RAISED_CAP;
 }
 
 const MILITARY_BRANCHES = [
@@ -192,36 +200,34 @@ const MILITARY_BRANCHES = [
     id: "Navy",
     standardCap: 6,
     raiseCapIf: function(priority, stance){ return stance === "Projecting" || priority === "Specialized"; },
-    raisedCapType: "fixed",
+    raisedCap: function(priority, stance){ return raisedBranchCap(priority); },
     raiseDescription: "Raises to 9 (11 with Specialized priority) with Projecting stance or Specialized priority.",
   },
   {
     id: "Army",
     standardCap: 7,
-    raiseCapIf: function(priority, stance){ return priority === "Quantity"; },
-    raisedCapType: "fixed",
-    raiseDescription: "Raises to 9 with Quantity priority.",
+    raiseCapIf: function(priority, stance){ return priority === "Quantity" || priority === "Specialized"; },
+    raisedCap: function(priority, stance){ return raisedBranchCap(priority); },
+    raiseDescription: "Raises to 9 (11 with Specialized priority) with Quantity or Specialized priority.",
   },
   {
     id: "Air Force",
     standardCap: 5,
     raiseCapIf: function(priority, stance){ return priority === "Quality" || priority === "Specialized"; },
-    raisedCapType: "fixed",
+    raisedCap: function(priority, stance){ return raisedBranchCap(priority); },
     raiseDescription: "Raises to 9 (11 with Specialized priority) with Quality or Specialized priority.",
   },
   {
     // No standard cap was given for this branch at all - unlike the other
     // four, it isn't just "harder to max out," it's unavailable entirely
     // without the right Doctrine. standardCap of 0 plus requiresUnlock
-    // models "locked out" rather than "capped low." Once unlocked, it
-    // isn't held to the fixed 9/11 ceiling above - it can use the whole
-    // points budget, since no cap was given for it at all.
+    // models "locked out" rather than "capped low."
     id: "Expeditionary Forces",
     standardCap: 0,
     requiresUnlock: true,
     raiseCapIf: function(priority, stance){ return stance === "Projecting" || stance === "Aggressive" || stance === "Combative"; },
-    raisedCapType: "budget",
-    raiseDescription: "Unlocks (up to your full points budget) with Projecting, Combative, or Aggressive stance.",
+    raisedCap: function(priority, stance){ return raisedExpeditionaryCap(priority); },
+    raiseDescription: "Unlocks to 5 (7 with Specialized priority) with Projecting, Combative, or Aggressive stance.",
   },
   {
     id: "Paramilitary / Militia / Gendarmes",
@@ -230,7 +236,7 @@ const MILITARY_BRANCHES = [
     // the levelsPerPoint conversion, not a lower ceiling.
     standardCap: MILITARY_FOCUS_BASE_POINTS,
     raiseCapIf: function(){ return true; },
-    raisedCapType: "budget",
+    raisedCap: function(priority, stance){ return militaryFocusBudget(stance); },
     levelsPerPoint: function(priority){ return priority === "Quality" ? 1 : 2; },
     raiseDescription: "Not capped below your total points budget. Each point buys 2 levels of strength, or 1 with Quality priority.",
   },

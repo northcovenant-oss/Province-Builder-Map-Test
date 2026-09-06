@@ -184,7 +184,7 @@
     const raised = chosenStance && branch.raiseCapIf && branch.raiseCapIf(chosenPriority, chosenStance);
     if(branch.requiresUnlock && !raised) return 0;
     if(!raised) return branch.standardCap;
-    return branch.raisedCapType === 'fixed' ? raisedBranchCap(chosenPriority) : militaryFocusBudget(chosenStance);
+    return branch.raisedCap(chosenPriority, chosenStance);
   }
 
   function pointsSpent(){
