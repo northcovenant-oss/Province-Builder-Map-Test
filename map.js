@@ -691,6 +691,7 @@
       '          energyProduction: fieldValue("Energy Production"),\n' +
       '          foodProduction: fieldValue("Food Production"),\n' +
       '          worldExports: worldExportsRanking(),\n' +
+      '          claimCode: (function(){ var el = document.getElementById("claimCodeValue"); return el ? el.textContent.trim() : ""; })(),\n' +
       '        };\n' +
       '        try {\n' +
       '          localStorage.setItem("landClaimSpecializationSnapshot", JSON.stringify(snapshot));\n' +

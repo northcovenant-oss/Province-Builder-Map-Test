@@ -483,7 +483,13 @@
     const specs = [0,1,2,3,4].map(function(i){ return chosenSpecs[i] || ''; });
     const priorityText = chosenStance === 'Pacifist' ? 'Pacifist (no military)' : (chosenPriority || '');
     const stanceText = chosenStance || '';
-    return CITIZEN_CARD_TEMPLATE
+    const army = String(focusValues['Army'] || 0);
+    const navy = String(focusValues['Navy'] || 0);
+    const airForce = String(focusValues['Air Force'] || 0);
+    const expeditionary = String(focusValues['Expeditionary Forces'] || 0);
+    const paramilitary = String(focusValues['Paramilitary / Militia / Gendarmes / Reserves'] || 0);
+
+    const card = CITIZEN_CARD_TEMPLATE
       .replace('{{NATION}}', snapshot.nation || 'Nation')
       .replace('{{JOIN_DATE}}', todayJoinDate())
       .replace('{{CLASSIFICATION}}', document.getElementById('identityClassification').value.trim())
@@ -496,11 +502,39 @@
       .replace('{{SPEC4}}', specs[3]).replace('{{SPEC5}}', specs[4])
       .replace('{{PRIORITY}}', priorityText)
       .replace('{{STANCE}}', stanceText)
-      .replace('{{ARMY}}', String(focusValues['Army'] || 0))
-      .replace('{{NAVY}}', String(focusValues['Navy'] || 0))
-      .replace('{{AIR_FORCE}}', String(focusValues['Air Force'] || 0))
-      .replace('{{EXPEDITIONARY}}', String(focusValues['Expeditionary Forces'] || 0))
-      .replace('{{PARAMILITARY}}', String(focusValues['Paramilitary / Militia / Gendarmes / Reserves'] || 0));
+      .replace('{{ARMY}}', army)
+      .replace('{{NAVY}}', navy)
+      .replace('{{AIR_FORCE}}', airForce)
+      .replace('{{EXPEDITIONARY}}', expeditionary)
+      .replace('{{PARAMILITARY}}', paramilitary);
+
+    // A copy-paste-ready block matching the FR (Form Responses) sheet's
+    // own column order (B through T - column A/Timestamp is filled by
+    // the sheet/form itself on submission), for whoever enters this
+    // claim's data into it - the player, or the admin team.
+    const adminInfo = [
+      'Nation: ' + (snapshot.nation || ''),
+      'Landbio Economy: ' + (snapshot.economyType || ''),
+      'GDP: ' + (snapshot.gdp || ''),
+      'Food Production: ' + (snapshot.foodProduction || ''),
+      'Energy Production: ' + (snapshot.energyProduction || ''),
+      'Population: ' + (snapshot.population || ''),
+      '1st Specialization: ' + specs[0],
+      '2nd Specialization: ' + specs[1],
+      '3rd Specialization: ' + specs[2],
+      '4th Specialization: ' + specs[3],
+      '5th Specialization: ' + specs[4],
+      'Military Priority: ' + priorityText,
+      'National Stance: ' + stanceText,
+      'Navy: ' + navy,
+      'Army: ' + army,
+      'Airforce: ' + airForce,
+      'Expeditionary Forces: ' + expeditionary,
+      'Paramilitary/Militia/Gendarmes: ' + paramilitary,
+      'Claim Code: ' + (snapshot.claimCode || ''),
+    ].join('\n');
+
+    return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo + '\n[/spoiler]';
   }
 
   // Same copy-to-clipboard pattern used on the bio page (map.js's
