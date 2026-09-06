@@ -516,6 +516,17 @@
             return '<p class="bio-field"><span class="bio-field-label">' + escapeHtml(parts[0]) + ':</span> ' +
               '<span class="bio-field-value">' + valueHtml + '</span></p>';
           }
+          // "%%COLLAPSE%%Label|paragraph text" -> a closed-by-default
+          // <details> block (native, no JS needed) so long descriptive
+          // prose (climate/economy write-ups) doesn't eat page space by
+          // default - the label is the always-visible toggle text.
+          if(para.indexOf('%%COLLAPSE%%') === 0){
+            const collapseParts = para.slice(12).split('|');
+            const collapseLabel = collapseParts[0];
+            const collapseBody = collapseParts.slice(1).join('|');
+            return '<details class="bio-collapse"><summary>' + escapeHtml(collapseLabel) + '</summary>' +
+              '<p>' + escapeHtml(collapseBody) + '</p></details>';
+          }
           // "%%TABLE%%Heading|Label1:Val1|Label2:Val2|..." -> a labeled
           // small table (any number of columns), matching the BBC code's
           // own tables (World Exports, the sector percentage row).
@@ -554,6 +565,11 @@
       '  .bio-section{ font-family:var(--font-display); font-size:15px; letter-spacing:0.4px; color:var(--ink); margin:26px 0 10px; padding-top:16px; border-top:1px solid var(--line); text-transform:uppercase; }\n' +
       '  .bio-section:first-of-type{ margin-top:18px; }\n' +
       '  .bio-placeholder{ font-family:var(--font-body); font-style:italic; font-size:14px; color:var(--ink-soft); background:rgba(0,0,0,0.03); border:1px dashed var(--line); border-radius:4px; padding:10px 12px; margin:0 0 14px; }\n' +
+      '  .bio-collapse{ margin:0 0 14px; }\n' +
+      '  .bio-collapse summary{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--gold); cursor:pointer; user-select:none; padding:2px 0; }\n' +
+      '  .bio-collapse summary:hover{ text-decoration:underline; }\n' +
+      '  .bio-collapse[open] summary{ margin-bottom:6px; }\n' +
+      '  .bio-collapse p{ font-family:var(--font-body); font-size:16px; line-height:1.7; color:var(--ink); margin:0; }\n' +
       '  .bio-field{ font-family:var(--font-body); font-size:16px; line-height:1.6; color:var(--ink); margin:0 0 4px; }\n' +
       '  .bio-field-label{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--ink-soft); margin-right:2px; }\n' +
       '  .bio-field-value{ font-style:italic; font-weight:600; }\n' +

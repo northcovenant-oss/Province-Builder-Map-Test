@@ -43,20 +43,16 @@
 
 function generateLandBio(provinces) {
   if (!provinces || provinces.length === 0) {
-    return { text: "No provinces claimed yet.", bbcCode: "", rawProvinces: [] };
+    return { text: "No provinces claimed yet.", bbcCode: "" };
   }
 
   const economics = computeEconomics(provinces);
   return {
     text: buildBioText(provinces, economics),
     bbcCode: buildBBCCode(provinces, economics),
-    // Raw per-province Population/Energy/Food/GDP numbers, for the bio
-    // page's own population-adjustment control to recompute from
-    // client-side - see applyPopulationMultiplier and its window export
-    // near the bottom of this file.
-    rawProvinces: economics.rawProvinces,
   };
 }
+
 
 // One shared pass over the claimed provinces — climates, econ categories,
 // and a randomized sector-percentage roll — that both output formats
@@ -94,6 +90,7 @@ function computeEconomics(provinces) {
   // Population: each province rolled independently (base 400,000-3 million x
   // its own econ modifier x its own climate modifier), then summed.
   const perProvincePopulation = provinces.map(p => ({ label: p.label, population: computeProvincePopulation(p) }));
+  const totalPopulation = perProvincePopulation.reduce((sum, e) => sum + e.population, 0);
 
   const energyProduction = computeEnergyProduction(provinces);
   const foodProduction = computeFoodProduction(provinces);
@@ -105,22 +102,7 @@ function computeEconomics(provinces) {
   // Population elsewhere on the page.
   const gdp = computeGDP(provinces, foodProduction.perProvince, energyProduction.perProvince, perProvincePopulation);
 
-  // Package the raw per-province numbers together so applyPopulationMultiplier
-  // can recompute Population/Energy/Food/GDP at any population level - both
-  // right here (always at multiplier=1, "0% change") and later, client-side,
-  // whenever the player picks a different level on the bio page.
-  const rawProvinces = provinces.map((p, i) => ({
-    label: p.label,
-    econ: p.econ,
-    basePopulation: perProvincePopulation[i].population,
-    energyRaw: energyProduction.perProvince[i] ? energyProduction.perProvince[i].value : 0,
-    foodRaw: foodProduction.perProvince[i] ? foodProduction.perProvince[i].value : 0,
-    gdpBase: gdp.perProvince[i] ? gdp.perProvince[i].base : 0,
-  }));
-  const adjusted = applyPopulationMultiplier(rawProvinces, 1);
-  const totalPopulation = adjusted.totalPopulation;
-
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp, rawProvinces, adjusted };
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -160,25 +142,22 @@ function buildBioText(provinces, econ) {
     bio += `%%FIELD%%Economy Type|${classification.name}` +
       (classification.pct != null ? ` (${classification.pct}% combined)` : ``) + `\n\n`;
     const desc = ECONOMY_DESCRIPTIONS[classification.name];
-    if (desc) bio += `${desc}\n\n`;
+    if (desc) bio += `%%COLLAPSE%%Economy Description|${desc}\n\n`;
 
     const exports = buildWorldExports(classification.name, t);
     if (exports.some(Boolean)) {
       bio += `%%TABLE%%World Exports|1st:${exports[0]}|2nd:${exports[1]}|3rd:${exports[2]}|4th:${exports[3]}|5th:${exports[4]}\n\n`;
     }
 
-    if (econ.adjusted) {
-      bio += `%%FIELD%%Total GDP|${formatCurrency(econ.adjusted.totalGDP)}\n\n`;
-    }
+    bio += `%%FIELD%%Total GDP|${formatCurrency(econ.gdp.total)}\n\n`;
   }
 
   bio += `## Resources & Production\n\n`;
-  bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.adjusted.totalEnergy)}\n\n`;
-  bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.adjusted.totalFood)}\n\n`;
+  bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.energyProduction.total)}\n\n`;
+  bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.foodProduction.total)}\n\n`;
 
   bio += `## Stable Population\n\n`;
   bio += `%%FIELD%%Population|${formatNumber(econ.totalPopulation)}\n\n`;
-  bio += `%%POPCONTROL%%\n\n`;
 
   bio += `Claimed provinces: ${provinceList}.`;
 
@@ -203,12 +182,13 @@ function buildClimateParagraphs(provinces, econ) {
   econ.majorClimates.forEach(e => {
     const detail = CLIMATE_DETAILS[e.name];
     if (!detail) {
-      out += `${e.name} climate covers roughly ${Math.round(e.pct)}% of the claimed territory. ${describeClimate(e.name)}.\n\n`;
+      out += `%%FIELD%%Climate|${e.name} (${Math.round(e.pct)}% of claim)\n\n`;
+      out += `%%COLLAPSE%%Climate Description|${describeClimate(e.name)}.\n\n`;
       return;
     }
     const displayName = extractBBCLabel(detail.bbc) || e.name;
     out += `%%FIELD%%Climate|${displayName} (${Math.round(e.pct)}% of claim)\n\n`;
-    out += `${detail.features} ${detail.agriculture}\n\n`;
+    out += `%%COLLAPSE%%Climate Description|${detail.features} ${detail.agriculture}\n\n`;
 
     const seasons = extractBBCField(detail.bbc, "Season\\(s\\):");
     if (seasons) out += `%%FIELD%%Season(s)|${seasons}\n\n`;
@@ -330,8 +310,8 @@ function buildBBCCode(provinces, econ) {
     .replace("{{EXPORT_4}}", exports[3])
     .replace("{{EXPORT_5}}", exports[4])
     .replace("{{POPULATION}}", formatNumber(econ.totalPopulation))
-    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.adjusted.totalEnergy))
-    .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.adjusted.totalFood));
+    .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total))
+    .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.foodProduction.total));
 }
 
 // ---- climate reference data ----
@@ -674,94 +654,6 @@ function formatCurrency(n) {
   return "$" + formatNumber(Math.round(n));
 }
 
-// ---- population adjustment (the "change your population" slider) ----
-//
-// Single source of truth for turning raw per-province data into the
-// Population / Energy Production / Food Production / GDP figures shown
-// on the page, at whatever population level the player has chosen. Used
-// twice: once here at generation time (always called with multiplier=1,
-// i.e. "0% change" - the player's stable population, exactly matching
-// every figure this file already computed before this feature existed),
-// and again client-side in the bio page's own <script> block every time
-// the player picks a different population level - map.js embeds this
-// exact function via .toString() rather than reimplementing it, so the
-// two can never drift apart. That's also why it's written with no
-// references to anything outside its own parameters/body.
-//
-// Calibration (no exact numbers were specified, so these are my own
-// starting point - flag if they don't feel right):
-//   - Population increase (multiplier > 1): Energy/Food Production lose
-//     an exponentially-growing "consumption" amount, scaled to that
-//     province's own adjusted population. Zero at multiplier=1.
-//   - Population decrease (multiplier < 1): Energy/Food Production drop
-//     by a mild LINEAR penalty (workforce effect), scaled the same way.
-//     Zero at multiplier=1.
-//   - GDP always uses the adjusted population directly in its modifier
-//     (already linear in the existing formula), so it moves up or down
-//     with population automatically, no separate coefficient needed.
-function applyPopulationMultiplier(rawProvinces, multiplier) {
-  const delta = multiplier - 1;
-  const CONSUMPTION_BASE_RATE = 10;      // above-stable growth's food/energy cost - back to
-                                          // its original strength (the "lower" rate was
-                                          // meant for below-stable, not this side)
-  const CONSUMPTION_EXPONENT = 2;
-  const PRODUCTION_DECREASE_RATE = 3;    // lowered from 5 - below-stable populations consume
-                                          // (and therefore cost) less than before
-  const GDP_POP_DECREASE_EXPONENT = 2;   // makes GDP fall off faster as population drops
-                                          // below stable - see the modifier calc below
-
-  let totalPopulation = 0, totalEnergy = 0, totalFood = 0, totalGDP = 0;
-  const perProvince = rawProvinces.map(function(p) {
-    const adjustedPop = Math.round(p.basePopulation * multiplier);
-
-    let energyValue = p.energyRaw;
-    let foodValue = p.foodRaw;
-    if (delta < 0) {
-      // A subtractive penalty, not a multiplicative one - multiplying by a
-      // factor<1 would make an already-negative value LESS negative (i.e.
-      // improve it), which is backwards for provinces that are net
-      // consumers rather than net producers. Subtracting a small amount
-      // scaled to this province's own adjusted population instead pushes
-      // the value down regardless of its starting sign, consistently
-      // matching "production should also decrease slightly."
-      const workforcePenalty = (adjustedPop / 4500000) * PRODUCTION_DECREASE_RATE * Math.abs(delta);
-      energyValue = p.energyRaw - workforcePenalty;
-      foodValue = p.foodRaw - workforcePenalty;
-    } else if (delta > 0) {
-      const consumption = (adjustedPop / 4500000) * CONSUMPTION_BASE_RATE * Math.pow(delta, CONSUMPTION_EXPONENT);
-      energyValue = p.energyRaw - consumption;
-      foodValue = p.foodRaw - consumption;
-    }
-
-    // GDP's population term shrinks faster than linearly once population
-    // drops below stable (multiplier^2 instead of multiplier), so a small
-    // population hurts GDP more sharply than before. At/above stable
-    // (multiplier>=1) this is unchanged - still plain linear growth. The
-    // two branches agree exactly at multiplier=1 (1^2 = 1), so "0% change"
-    // still matches everything computed before this feature existed.
-    const gdpPopTerm = multiplier < 1
-      ? (p.basePopulation / 4500000) * Math.pow(multiplier, GDP_POP_DECREASE_EXPONENT)
-      : (adjustedPop / 4500000);
-    const modifier = (foodValue / 20) + Math.abs(energyValue / 10) + gdpPopTerm;
-    const gdp = Math.round(p.gdpBase * modifier);
-
-    totalPopulation += adjustedPop;
-    totalEnergy += energyValue;
-    totalFood += foodValue;
-    totalGDP += gdp;
-
-    return { label: p.label, econ: p.econ, adjustedPop: adjustedPop, energyValue: energyValue, foodValue: foodValue, gdp: gdp };
-  });
-
-  return {
-    totalPopulation: totalPopulation,
-    totalEnergy: Math.round(totalEnergy),
-    totalFood: Math.round(totalFood) - 20 * rawProvinces.length,
-    totalGDP: totalGDP,
-    perProvince: perProvince,
-  };
-}
-
 // Returns { Services, Manufacturing, Extraction, LightIndustry, HeavyIndustry }
 // percentages (integers) for a single province's econ category, or null if
 // the category isn't recognized. Services + Manufacturing + Extraction sum
@@ -1085,19 +977,6 @@ function describeClimate(name) {
 
 // Expose globally so map.js can call it without a module bundler.
 window.generateLandBio = generateLandBio;
-
-// Exposed so map.js can embed their EXACT source (via .toString()) into
-// the bio page's own <script>, for the population-adjustment control to
-// call client-side - guarantees the client-side copy can never drift
-// from the one used here at generation time, since it's the same code.
-window.applyPopulationMultiplier = applyPopulationMultiplier;
-window.formatNumber = formatNumber;
-window.formatSigned = formatSigned;
-window.energyStatusLabel = energyStatusLabel;
-window.formatEnergyProduction = formatEnergyProduction;
-window.foodClassification = foodClassification;
-window.formatFoodProduction = formatFoodProduction;
-window.formatCurrency = formatCurrency;
 
 /*
  * NOTE ON ASYNC / AI-GENERATED BIOS
