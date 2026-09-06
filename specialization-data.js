@@ -6,12 +6,9 @@
  * the general Heavy Industry pool so they're reserved for the military
  * step rather than also being pickable as a regular specialization.
  *
- * SPECIALIZATION_ECONOMY_MAP decides which pool(s) a claim's Economic
- * Classification (see landbio.js's classifyEconomy) draws its Step 1
- * options from - pure sectors draw from one pool, blended economies draw
- * from the two pools matching their pair, and "Diversified Economy" (the
- * catch-all for claims too evenly split to classify) can draw from all
- * four.
+ * Step 1's five slots are tied to the land bio's own World Exports
+ * ranking, not freely chosen from the whole economy type - see
+ * EXPORT_LABEL_TO_POOLS / poolsForExportLabel below.
  */
 
 const SPECIALIZATION_POOLS = {
@@ -137,25 +134,38 @@ const MILITARY_SPECIALIZATIONS = [
   "Defense - Submarines",
 ];
 
-// Which pool(s) each Economic Classification draws Step 1 options from.
-// Matches classifyEconomy's ten named types one-for-one, keyed the same
-// way landbio.js already keys ECONOMY_SECTOR_KEYS.
-const SPECIALIZATION_ECONOMY_MAP = {
-  "Service Economy":                     ["Services"],
-  "Consumer Goods Economy":              ["Light Industry"],
-  "Industrial Economy":                  ["Heavy Industry"],
-  "Resource Economy":                    ["Primary"],
-  "Consumer Goods & Services Economy":   ["Services", "Light Industry"],
-  "Consumer Goods & Materials Economy":  ["Light Industry", "Primary"],
-  "Manufacturing Economy":               ["Light Industry", "Heavy Industry"],
-  "Industrial Goods & Services Economy": ["Heavy Industry", "Services"],
-  "Industrial Goods & Materials Economy":["Heavy Industry", "Primary"],
-  "Non-Industrial Economy":              ["Services", "Primary"],
-  // Not one of classifyEconomy's ten named types - it's landbio.js's own
-  // fallback for claims too evenly split to hit any threshold. Since
-  // there's no single sector story to draw from, it can draw from
-  // everything.
-  "Diversified Economy":                 ["Primary", "Services", "Light Industry", "Heavy Industry"],
-};
-
 const SPECIALIZATION_COUNT = 5;
+
+// Maps a World Exports rank's sector label (from landbio.js's
+// buildWorldExports - "Services", "Consumer Goods", "Industrial Goods",
+// "Raw Materials", combinations like "Services or Raw Materials", or
+// "Any") to which SPECIALIZATION_POOLS keys it draws from. This is what
+// ties each of the 5 Step 1 slots to the claim's actual generated export
+// ranking, rather than letting the player freely pick from their whole
+// economy type's pool.
+const EXPORT_LABEL_TO_POOLS = {
+  "Services":         ["Services"],
+  "Consumer Goods":   ["Light Industry"],
+  "Industrial Goods": ["Heavy Industry"],
+  "Raw Materials":    ["Primary"],
+};
+const ALL_POOL_NAMES = ["Primary", "Services", "Light Industry", "Heavy Industry"];
+
+function poolsForExportLabel(label){
+  if(!label) return ALL_POOL_NAMES.slice();
+  const trimmed = label.trim();
+  if(trimmed === "Any") return ALL_POOL_NAMES.slice();
+  if(EXPORT_LABEL_TO_POOLS[trimmed]) return EXPORT_LABEL_TO_POOLS[trimmed].slice();
+  if(trimmed.indexOf(" or ") !== -1){
+    let pools = [];
+    trimmed.split(" or ").forEach(function(part){
+      const mapped = EXPORT_LABEL_TO_POOLS[part.trim()];
+      if(mapped) pools = pools.concat(mapped);
+    });
+    if(pools.length > 0) return pools;
+  }
+  // Unrecognized label (shouldn't normally happen) - fall back to
+  // offering everything rather than leaving the slot with no options.
+  return ALL_POOL_NAMES.slice();
+}
+

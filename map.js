@@ -654,6 +654,19 @@
       '          }\n' +
       '          return "";\n' +
       '        }\n' +
+      '        function worldExportsRanking(){\n' +
+      '          var tables = document.querySelectorAll(".bio-export-table");\n' +
+      '          for(var i=0;i<tables.length;i++){\n' +
+      '            var labelDiv = tables[i].previousElementSibling;\n' +
+      '            if(labelDiv && labelDiv.textContent.replace(/:$/,"") === "World Exports"){\n' +
+      '              var cells = tables[i].querySelectorAll("tbody td");\n' +
+      '              var ranks = [];\n' +
+      '              for(var j=0;j<cells.length;j++){ ranks.push(cells[j].textContent); }\n' +
+      '              return ranks;\n' +
+      '            }\n' +
+      '          }\n' +
+      '          return [];\n' +
+      '        }\n' +
       '        var snapshot = {\n' +
       '          nation: nationInput ? nationInput.value.trim() : "",\n' +
       '          economyType: fieldValue("Economy Type"),\n' +
@@ -661,6 +674,7 @@
       '          gdp: fieldValue("Total GDP"),\n' +
       '          energyProduction: fieldValue("Energy Production"),\n' +
       '          foodProduction: fieldValue("Food Production"),\n' +
+      '          worldExports: worldExportsRanking(),\n' +
       '        };\n' +
       '        try {\n' +
       '          localStorage.setItem("landClaimSpecializationSnapshot", JSON.stringify(snapshot));\n' +
