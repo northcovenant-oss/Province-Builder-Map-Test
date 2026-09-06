@@ -1,3 +1,14 @@
+/* style.css sets html,body{overflow:hidden} globally, for the main map
+   page's fixed full-viewport layout - since this page shares that same
+   stylesheet, it inherited that rule and couldn't scroll at all. This
+   file loads after style.css, so this safely overrides it (same
+   selector, later source order) without touching style.css itself,
+   which other pages still need overflow:hidden for. */
+html, body {
+  overflow: auto !important;
+  height: auto !important;
+}
+
 body.spec-page {
   min-height: 100vh;
   min-height: 100dvh;
