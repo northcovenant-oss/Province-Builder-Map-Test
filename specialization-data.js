@@ -39,22 +39,23 @@ const SPECIALIZATION_POOLS = {
     "Mass Media - Broadcast (News & TV)",
     "Mass Media - Music Industry",
     "Mass Media - Digital Media",
-    "Public Health",
-    "Information Technology",
+    "Healthcare",
+    "Information technology",
     "Consulting",
     "Gambling",
     "Retailer - Online Store",
     "Retailer - Superstore",
-    "Retail Sales - Luxury Brand",
-    "Financial Services - Banking",
-    "Financial Services - Insurance",
-    "Financial Services - Investment Management",
-    "Professional Services - Accounting",
-    "Professional Services - Legal Services",
-    "Professional Services - Management Consulting",
+    "Retail sales - Luxury Brand",
+    "Financial services - Banking",
+    "Financial services - Insurance",
+    "Financial services - Investment management",
+    "Professional services - Accounting",
+    "Professional services - Legal services",
+    "Professional services - Management consulting",
     "Cargo Transportation - Air",
     "Cargo Transportation - Ship",
     "Cargo Transportation - Rail",
+    "Cargo Transportation - Road",
     "Commercial Transportation - Air",
     "Commercial Transportation - Ship",
     "Commercial Transportation - Rail",
@@ -75,9 +76,10 @@ const SPECIALIZATION_POOLS = {
     "Foodstuffs - Packaged Food",
     "Foodstuffs - Snacks",
     "Animal Feed",
-    "Leather Industry",
+    "Leather industry",
     "Attire - Accessories",
     "Attire - Clothing",
+    "Ceramics & Glassware",
     "Attire - Footwear",
     "Textiles - Cotton",
     "Textiles - Natural Fibers",
@@ -114,8 +116,10 @@ const SPECIALIZATION_POOLS = {
     "Engineering - Civil",
     "Engineering - Environmental",
     "Engineering - Robotics",
+    "General Machinery",
     "Locomotive - Rapid Transit & Light Rail",
-    "Locomotive - Freight & Passenger",
+    "Locomotive - Freight",
+    "Locomotive - Passenger/High Speed",
     "Metals - Alloys",
     "Metals - Refined Metals",
     "Metals - Steel",
@@ -278,3 +282,89 @@ function poolsForExportLabel(label){
   return ALL_POOL_NAMES.slice();
 }
 
+// ---- Live Market Saturation (Google Sheet integration) ----
+//
+// The community's "Rylet Land Bio Data" sheet tracks, per specialization,
+// how many finished land bios share that same World Export - the ST
+// sheet's row 1 has the specialization names, row 3 has the resulting
+// Market Saturation label (computed by the sheet itself; this file just
+// displays whatever it says, it doesn't compute saturation itself).
+// Fetched live so it stays current as more nations submit bios, rather
+// than a snapshot that goes stale immediately - see fetchMarketSaturation
+// below.
+//
+// NOTE: I could not do a live end-to-end test of this exact fetch from a
+// real browser (no network access in the environment I built this in) -
+// the CSV export URL format below is Google's standard, documented
+// public-sheet export pattern, and the sheet loaded successfully when I
+// fetched it directly to inspect its structure, but please confirm the
+// live page actually pulls data correctly once deployed, and let me know
+// if the sheet's sharing settings need adjusting for this to work.
+const MARKET_DATA_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/export?format=csv&gid=1017667740";
+
+// The six states, in ascending order of "how occupied" the market is.
+// `fill` drives a small pie-style badge (see the CSS), `color` tints it -
+// a simple green-to-red spectrum so the visual reads at a glance even
+// before you know the exact label, with the label itself always in the
+// legend and each badge's title/tooltip too.
+const MARKET_SATURATION_LEVELS = [
+  { id: "Untapped Market",     fill: "0%",   color: "#2e7d32" },
+  { id: "Monopoly",            fill: "20%",  color: "#1565c0" },
+  { id: "Rival Markets",       fill: "40%",  color: "#00897b" },
+  { id: "Balanced Market",     fill: "60%",  color: "#c9a227" },
+  { id: "Saturated Market",    fill: "80%",  color: "#ef6c00" },
+  { id: "Oversaturated Market",fill: "100%", color: "#c62828" },
+];
+
+// Minimal CSV row parser (handles quoted fields, escaped quotes) - no
+// external library, consistent with the rest of this static site.
+function parseCsvLine(line){
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; }
+        else { inQuotes = false; }
+      } else { cur += c; }
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ",") { result.push(cur); cur = ""; }
+      else cur += c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+// Fetches and parses the ST sheet, calling back with a map of
+// { "Specialization Name": "Saturation Level" } on success, or
+// callback(null, error) on failure (network error, sheet moved/private,
+// unexpected format, etc.) - callers should degrade gracefully rather
+// than block on this.
+function fetchMarketSaturation(callback){
+  fetch(MARKET_DATA_CSV_URL)
+    .then(function(res){
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      return res.text();
+    })
+    .then(function(csvText){
+      const rows = csvText.split(/\r?\n/).map(parseCsvLine);
+      const nameRow = rows[0] || [];
+      const saturationRow = rows[2] || []; // row 3 (0-indexed: row 2)
+      const validLevels = MARKET_SATURATION_LEVELS.map(function(l){ return l.id; });
+      const map = {};
+      nameRow.forEach(function(name, i){
+        const trimmedName = (name || "").trim();
+        const trimmedSat = (saturationRow[i] || "").trim();
+        if(trimmedName && validLevels.indexOf(trimmedSat) !== -1){
+          map[trimmedName.toLowerCase()] = trimmedSat;
+        }
+      });
+      callback(map, null);
+    })
+    .catch(function(err){ callback(null, err); });
+}

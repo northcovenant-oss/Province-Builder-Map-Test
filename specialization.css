@@ -313,6 +313,45 @@ body.spec-page {
 .spec-option.disabled { opacity: 0.4; cursor: not-allowed; }
 .spec-option.disabled:hover { background: none; }
 
+/* ---- Market Saturation badges + legend ---- */
+.market-badge {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: conic-gradient(currentColor var(--fill, 0%), transparent 0);
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+.market-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.market-legend-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.market-legend-error { text-transform: none; letter-spacing: normal; font-style: italic; }
+.market-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .spec-group-label {
   grid-column: 1 / -1;
   font-family: var(--font-display);

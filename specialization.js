@@ -110,6 +110,62 @@
 
   for(let rank = 0; rank < 5; rank++){ specSlotsEl.appendChild(buildSlot(rank)); }
 
+  // ---- Market Saturation (live from the community's Google Sheet) ----
+  // Shows a colored badge next to each specialization reflecting how many
+  // other nations already share that export, plus a legend explaining
+  // what each color means. Fetched after the slots render, so Step 1 is
+  // usable immediately even if this is slow or fails outright.
+  const marketLegendEl = document.createElement('div');
+  marketLegendEl.className = 'market-legend';
+  marketLegendEl.innerHTML = '<span class="market-legend-label">Loading market saturation data\u2026</span>';
+  specSlotsEl.parentNode.insertBefore(marketLegendEl, specSlotsEl);
+
+  function renderMarketLegend(){
+    marketLegendEl.innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'market-legend-label';
+    label.textContent = 'Market Saturation:';
+    marketLegendEl.appendChild(label);
+    MARKET_SATURATION_LEVELS.forEach(function(level){
+      const item = document.createElement('span');
+      item.className = 'market-legend-item';
+      const badge = document.createElement('span');
+      badge.className = 'market-badge';
+      badge.style.setProperty('--fill', level.fill);
+      badge.style.color = level.color;
+      item.appendChild(badge);
+      item.appendChild(document.createTextNode(level.id));
+      marketLegendEl.appendChild(item);
+    });
+  }
+
+  function applyMarketBadges(map){
+    specSlotsEl.querySelectorAll('.spec-option').forEach(function(optionLabel){
+      const input = optionLabel.querySelector('input[type="radio"]');
+      if(!input) return;
+      const status = map[input.value.toLowerCase()];
+      if(!status) return;
+      const level = MARKET_SATURATION_LEVELS.filter(function(l){ return l.id === status; })[0];
+      if(!level) return;
+      const badge = document.createElement('span');
+      badge.className = 'market-badge';
+      badge.style.setProperty('--fill', level.fill);
+      badge.style.color = level.color;
+      badge.title = status;
+      optionLabel.insertBefore(badge, optionLabel.firstChild);
+    });
+  }
+
+  fetchMarketSaturation(function(map, err){
+    if(err || !map){
+      marketLegendEl.innerHTML = '<span class="market-legend-label market-legend-error">' +
+        'Couldn\u2019t load live market saturation data - specializations are shown without it.</span>';
+      return;
+    }
+    renderMarketLegend();
+    applyMarketBadges(map);
+  });
+
   // Once a specialization is picked for one rank, it's disabled in every
   // other rank's list - the same specialty shouldn't be both your 1st and
   // 3rd export, for example.
