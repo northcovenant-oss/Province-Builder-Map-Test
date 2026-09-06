@@ -190,17 +190,83 @@ body.spec-page {
   margin: 0 0 16px;
 }
 
+/* ---- Military Doctrine / Focus ---- */
+.mil-subheading {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+  margin: 22px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.mil-subheading:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+.mil-question {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+.doctrine-option {
+  align-items: flex-start;
+  line-height: 1.4;
+}
+.doctrine-option input { margin-top: 3px; }
+.single-select.spec-options { grid-template-columns: 1fr; max-height: none; margin-bottom: 8px; }
+
+.focus-points-remaining {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink);
+  margin: 4px 0 14px;
+}
+.focus-points-remaining #focusPointsRemaining {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.focus-branch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.focus-branch:last-child { border-bottom: none; }
+.focus-branch.locked { opacity: 0.55; }
+.focus-branch label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  min-width: 220px;
+}
+.focus-cap-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.focus-branch input[type="number"] {
+  width: 60px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.focus-levels-note {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
 
 .spec-options {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px 16px;
-  max-height: 420px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.spec-slot .spec-options {
-  max-height: 180px;
 }
 @media (max-width: 560px) {
   .spec-options { grid-template-columns: 1fr; }

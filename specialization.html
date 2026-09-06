@@ -59,11 +59,26 @@
       <div id="specSlots"><!-- populated by specialization.js, one section per export rank --></div>
     </div>
 
-    <!-- ===== Step 2: Military Specialization ===== -->
+    <!-- ===== Step 2: Military Doctrine + Focus ===== -->
     <div class="spec-card step-panel" id="step2" data-step-panel="2" hidden>
-      <h2>Step 2 &middot; Military Specialization</h2>
-      <p class="step-intro">Choose the one area of defense manufacturing your nation is most known for.</p>
-      <div class="spec-options single-select" id="militaryOptions"><!-- populated by specialization.js --></div>
+      <h2>Step 2 &middot; Military</h2>
+
+      <h3 class="mil-subheading">Military Doctrine</h3>
+
+      <h4 class="mil-question">Military Priority</h4>
+      <p class="step-intro" id="militaryPriorityIntro"></p>
+      <div class="spec-options single-select" id="militaryPriorityOptions"><!-- populated by specialization.js --></div>
+
+      <h4 class="mil-question">Military Stance</h4>
+      <p class="step-intro" id="militaryStanceIntro"></p>
+      <div class="spec-options single-select" id="militaryStanceOptions"><!-- populated by specialization.js --></div>
+
+      <h3 class="mil-subheading">Military Focus</h3>
+      <p class="step-intro" id="militaryFocusIntro"></p>
+      <div class="focus-points-remaining">
+        <span id="focusPointsRemaining">&mdash;</span> points remaining of <span id="focusPointsTotal">&mdash;</span>
+      </div>
+      <div id="militaryFocusBranches"><!-- populated by specialization.js --></div>
     </div>
 
     <!-- ===== Step 3: Adjust Energy/Agricultural Production ===== -->

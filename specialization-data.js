@@ -97,6 +97,16 @@ const SPECIALIZATION_POOLS = {
     "Chemical - Pharmaceuticals",
     "Construction - Commercial",
     "Construction - Industrial",
+    "Defense - Ammunition",
+    "Defense - Armoured Fighting Vehicle",
+    "Defense - Artillery",
+    "Defense - Explosives",
+    "Defense - Firearms",
+    "Defense - Missiles",
+    "Defense - Military Aircraft",
+    "Defense - Military Vehicles",
+    "Defense - Ships",
+    "Defense - Submarines",
     "Electronics - Semiconductor",
     "Energy - Nuclear",
     "Energy - Renewable",
@@ -119,20 +129,94 @@ const SPECIALIZATION_POOLS = {
   ],
 };
 
-// Held out of the Heavy Industry pool above - these are Step 2's options
-// (a single military specialization), not part of the general Step 1 pool.
-const MILITARY_SPECIALIZATIONS = [
-  "Defense - Ammunition",
-  "Defense - Armoured Fighting Vehicle",
-  "Defense - Artillery",
-  "Defense - Explosives",
-  "Defense - Firearms",
-  "Defense - Missiles",
-  "Defense - Military Aircraft",
-  "Defense - Military Vehicles",
-  "Defense - Ships",
-  "Defense - Submarines",
+// ---- Military Doctrine ----
+//
+// Military Priority: what a nation values most about its armed forces'
+// makeup. Each option's description is shown to the player alongside its
+// name.
+const MILITARY_PRIORITY_INTRO = "What does your nation prioritize? Does your country value a single branch " +
+  "above all else; a small, well-regulated army with strong discipline and good weaponry; a large, overwhelming " +
+  "force that makes up for its lack of training and arms by its sheer size; or a healthy balance sacrificing " +
+  "state-of-the-art equipment for a slightly larger size?";
+const MILITARY_PRIORITY_OPTIONS = [
+  { id: "Specialized", description: "Values a single branch above all else." },
+  { id: "Quality",     description: "A small, well-regulated army with strong discipline and good weaponry." },
+  { id: "Quantity",    description: "A large, overwhelming force that makes up for its lack of training and arms by its sheer size." },
+  { id: "Balanced",    description: "A healthy balance, sacrificing state-of-the-art equipment for a slightly larger size." },
 ];
+
+// Military Stance: national attitude towards war.
+const MILITARY_STANCE_INTRO = "What is your national attitude towards war?";
+const MILITARY_STANCE_OPTIONS = [
+  { id: "Pacifist",   description: "No military." },
+  { id: "Neutral",    description: "Armed but zero interference." },
+  { id: "Defensive",  description: "Protective of themselves and allies." },
+  { id: "Projecting", description: "Exerting pressure on those around them." },
+  { id: "Combative",  description: "Actively hostile towards elements of the international community." },
+  { id: "Aggressive", description: "Seen as a pariah state by the international community; warmongering." },
+];
+
+// ---- Military Focus ----
+//
+// Players distribute a points budget across five branches to rank their
+// relative importance. The budget and each branch's cap depend on the
+// Doctrine choices above.
+const MILITARY_FOCUS_BASE_POINTS = 15;
+
+// Stance-based budget bonus. Pacifist overrides everything else to 0
+// (matches "No military" - Focus is skipped entirely for Pacifist).
+function militaryFocusBudget(stance){
+  if(stance === "Pacifist") return 0;
+  if(stance === "Combative" || stance === "Aggressive") return MILITARY_FOCUS_BASE_POINTS + 5;
+  if(stance === "Projecting") return MILITARY_FOCUS_BASE_POINTS + 2;
+  return MILITARY_FOCUS_BASE_POINTS;
+}
+
+// Each branch's standard cap, an optional raised cap unlocked by specific
+// Doctrine choices, and any special allocation rule. Where the source
+// material gave a raised cap as "7+"/"8+"/"6+" without an explicit
+// ceiling, the raised cap is treated as the player's whole budget (no
+// additional per-branch ceiling beyond what they have to spend) - flagged
+// here since that's my own reading of an open-ended figure, not a given
+// number.
+const MILITARY_BRANCHES = [
+  {
+    id: "Navy",
+    standardCap: 5,
+    raiseCapIf: function(priority, stance){ return stance === "Projecting" || priority === "Specialized"; },
+  },
+  {
+    id: "Army",
+    standardCap: 6,
+    raiseCapIf: function(priority, stance){ return priority === "Quantity"; },
+  },
+  {
+    id: "Air Force",
+    standardCap: 4,
+    raiseCapIf: function(priority, stance){ return priority === "Quality" || priority === "Specialized"; },
+  },
+  {
+    id: "Expeditionary Forces",
+    // No standard cap was given for this branch at all - unlike the
+    // other four, it isn't just "harder to max out," it's unavailable
+    // entirely without the right Doctrine. standardCap of 0 plus
+    // requiresUnlock models "locked out" rather than "capped low."
+    standardCap: 0,
+    requiresUnlock: true,
+    raiseCapIf: function(priority, stance){ return stance === "Projecting" || stance === "Aggressive"; },
+  },
+  {
+    id: "Paramilitary / Militia / Gendarmes",
+    // Not specially capped below the total budget - always tracks
+    // whatever the current budget is (15/17/20), same as any branch
+    // whose cap is "raised." The special rule here is the levelsPerPoint
+    // conversion, not a lower ceiling.
+    standardCap: MILITARY_FOCUS_BASE_POINTS,
+    raiseCapIf: function(){ return true; },
+    levelsPerPoint: function(priority){ return priority === "Quality" ? 1 : 2; },
+  },
+];
+
 
 const SPECIALIZATION_COUNT = 5;
 

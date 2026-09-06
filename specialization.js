@@ -134,22 +134,147 @@
     updateNextButtonState();
   });
 
-  // ---- Step 2: military specialization (single choice) ----
-  const militaryOptionsEl = document.getElementById('militaryOptions');
-  let chosenMilitary = null;
-  MILITARY_SPECIALIZATIONS.forEach(function(name){
-    const id = 'mil_' + name.replace(/[^a-z0-9]+/gi, '_');
-    const label = document.createElement('label');
-    label.className = 'spec-option';
-    label.setAttribute('for', id);
-    label.innerHTML = '<input type="radio" name="militaryChoice" id="' + id + '" value="' + name.replace(/"/g,'&quot;') + '"> ' + name;
-    militaryOptionsEl.appendChild(label);
-  });
-  militaryOptionsEl.addEventListener('change', function(e){
-    if(e.target.name !== 'militaryChoice') return;
-    chosenMilitary = e.target.value;
+  // ---- Step 2: Military Doctrine (Priority + Stance) ----
+  document.getElementById('militaryPriorityIntro').textContent = MILITARY_PRIORITY_INTRO;
+  document.getElementById('militaryStanceIntro').textContent = MILITARY_STANCE_INTRO;
+
+  let chosenPriority = null;
+  let chosenStance = null;
+
+  function buildDoctrineOptions(containerId, options, groupName, onChosen){
+    const container = document.getElementById(containerId);
+    options.forEach(function(opt){
+      const id = groupName + '_' + opt.id.replace(/[^a-z0-9]+/gi, '_');
+      const optLabel = document.createElement('label');
+      optLabel.className = 'spec-option doctrine-option';
+      optLabel.setAttribute('for', id);
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = groupName;
+      input.id = id;
+      input.value = opt.id;
+      optLabel.appendChild(input);
+      const textWrap = document.createElement('span');
+      const nameSpan = document.createElement('strong');
+      nameSpan.textContent = opt.id;
+      textWrap.appendChild(nameSpan);
+      textWrap.appendChild(document.createTextNode(' \u2014 ' + opt.description));
+      optLabel.appendChild(textWrap);
+      container.appendChild(optLabel);
+    });
+    container.addEventListener('change', function(e){
+      if(e.target.name !== groupName) return;
+      onChosen(e.target.value);
+      renderFocusBranches();
+      updateNextButtonState();
+    });
+  }
+
+  buildDoctrineOptions('militaryPriorityOptions', MILITARY_PRIORITY_OPTIONS, 'militaryPriority', function(v){ chosenPriority = v; });
+  buildDoctrineOptions('militaryStanceOptions', MILITARY_STANCE_OPTIONS, 'militaryStance', function(v){ chosenStance = v; });
+
+  // ---- Step 2: Military Focus (point allocation across 5 branches) ----
+  document.getElementById('militaryFocusIntro').textContent =
+    'Distribute your points between the different armed forces to rank their importance to your nation.';
+  const focusBranchesEl = document.getElementById('militaryFocusBranches');
+  const focusValues = {}; // branch id -> points currently allocated
+  MILITARY_BRANCHES.forEach(function(b){ focusValues[b.id] = 0; });
+
+  function branchCap(branch){
+    if(!chosenStance) return branch.requiresUnlock ? 0 : branch.standardCap;
+    const raised = branch.raiseCapIf && branch.raiseCapIf(chosenPriority, chosenStance);
+    if(branch.requiresUnlock) return raised ? militaryFocusBudget(chosenStance) : 0;
+    return raised ? militaryFocusBudget(chosenStance) : branch.standardCap;
+  }
+
+  function pointsSpent(){
+    return MILITARY_BRANCHES.reduce(function(sum, b){ return sum + (focusValues[b.id] || 0); }, 0);
+  }
+
+  function renderFocusBranches(){
+    const budget = chosenStance ? militaryFocusBudget(chosenStance) : MILITARY_FOCUS_BASE_POINTS;
+    const isPacifist = chosenStance === 'Pacifist';
+    focusBranchesEl.innerHTML = '';
+
+    MILITARY_BRANCHES.forEach(function(branch){
+      const cap = Math.min(branchCap(branch), budget);
+      // Clamp any already-entered value down if a doctrine change lowered this branch's cap.
+      if(focusValues[branch.id] > cap) focusValues[branch.id] = cap;
+
+      const row = document.createElement('div');
+      row.className = 'focus-branch' + (cap === 0 ? ' locked' : '');
+
+      const label = document.createElement('label');
+      label.textContent = branch.id;
+      if(branch.requiresUnlock && cap === 0){
+        const note = document.createElement('span');
+        note.className = 'focus-cap-note';
+        note.textContent = ' (locked - requires Projecting or Aggressive stance)';
+        label.appendChild(note);
+      } else {
+        const note = document.createElement('span');
+        note.className = 'focus-cap-note';
+        note.textContent = ' (max ' + cap + ')';
+        label.appendChild(note);
+      }
+      row.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(cap);
+      input.value = String(focusValues[branch.id]);
+      input.disabled = isPacifist || cap === 0;
+      input.setAttribute('data-branch', branch.id);
+      row.appendChild(input);
+
+      if(branch.levelsPerPoint){
+        const levelsNote = document.createElement('span');
+        levelsNote.className = 'focus-levels-note';
+        const perPoint = branch.levelsPerPoint(chosenPriority);
+        levelsNote.textContent = '= ' + (focusValues[branch.id] * perPoint) + ' levels (' + perPoint + ' per point)';
+        row.appendChild(levelsNote);
+      }
+
+      focusBranchesEl.appendChild(row);
+    });
+
+    document.getElementById('focusPointsTotal').textContent = isPacifist ? '0 (Pacifist - no military)' : budget;
+    updateRemainingPoints();
+  }
+
+  function updateRemainingPoints(){
+    const budget = chosenStance ? militaryFocusBudget(chosenStance) : MILITARY_FOCUS_BASE_POINTS;
+    const remaining = budget - pointsSpent();
+    document.getElementById('focusPointsRemaining').textContent = remaining;
+  }
+
+  focusBranchesEl.addEventListener('input', function(e){
+    if(e.target.tagName !== 'INPUT') return;
+    const branchId = e.target.getAttribute('data-branch');
+    const branch = MILITARY_BRANCHES.filter(function(b){ return b.id === branchId; })[0];
+    if(!branch) return;
+    let val = parseInt(e.target.value, 10);
+    if(isNaN(val) || val < 0) val = 0;
+    const cap = Math.min(branchCap(branch), chosenStance ? militaryFocusBudget(chosenStance) : MILITARY_FOCUS_BASE_POINTS);
+    if(val > cap) val = cap;
+    // Also can't exceed remaining budget across all branches combined.
+    const otherSpent = pointsSpent() - (focusValues[branchId] || 0);
+    const budget = chosenStance ? militaryFocusBudget(chosenStance) : MILITARY_FOCUS_BASE_POINTS;
+    if(otherSpent + val > budget) val = Math.max(0, budget - otherSpent);
+    focusValues[branchId] = val;
+    e.target.value = String(val);
+    if(branch.levelsPerPoint){
+      const row = e.target.closest('.focus-branch');
+      const levelsNote = row.querySelector('.focus-levels-note');
+      const perPoint = branch.levelsPerPoint(chosenPriority);
+      levelsNote.textContent = '= ' + (val * perPoint) + ' levels (' + perPoint + ' per point)';
+    }
+    updateRemainingPoints();
     updateNextButtonState();
   });
+
+  renderFocusBranches();
 
   // ---- Step 3: show chosen specializations for reference ----
   function renderChosenSummary(){
@@ -173,7 +298,15 @@
   function updateNextButtonState(){
     let enabled = true;
     if(currentStep === 1) enabled = chosenSpecs.every(Boolean);
-    if(currentStep === 2) enabled = !!chosenMilitary;
+    if(currentStep === 2){
+      // Doctrine (both Priority and Stance) always required. Focus points
+      // must be fully allocated too, UNLESS Pacifist (budget is 0, so
+      // there's nothing to allocate - Focus is effectively skipped).
+      const doctrineChosen = !!chosenPriority && !!chosenStance;
+      const budget = chosenStance ? militaryFocusBudget(chosenStance) : MILITARY_FOCUS_BASE_POINTS;
+      const focusComplete = chosenStance === 'Pacifist' || pointsSpent() === budget;
+      enabled = doctrineChosen && focusComplete;
+    }
     nextBtn.disabled = !enabled;
   }
 
@@ -204,7 +337,11 @@
 
   function renderFinalSummary(){
     document.getElementById('summarySpecs').textContent = chosenSpecs.filter(Boolean).join(', ') || '\u2014';
-    document.getElementById('summaryMilitary').textContent = chosenMilitary || '\u2014';
+    const militarySummary = chosenStance === 'Pacifist'
+      ? 'Pacifist - no military'
+      : (chosenPriority || '\u2014') + ' priority, ' + (chosenStance || '\u2014') + ' stance \u2014 ' +
+        MILITARY_BRANCHES.map(function(b){ return b.id + ': ' + (focusValues[b.id] || 0); }).join(', ');
+    document.getElementById('summaryMilitary').textContent = militarySummary;
     const popSelect = document.getElementById('specPopAdjust');
     const pct = parseInt(popSelect.value, 10);
     document.getElementById('summaryPopLevel').textContent = (pct >= 0 ? '+' : '') + pct + '%' + (pct === 0 ? ' (Stable)' : '');
