@@ -507,3 +507,50 @@ body.spec-page {
   text-decoration: none;
   display: inline-block;
 }
+
+/* ---- Step 5: National Identity + Citizen Card ---- */
+.identity-field {
+  margin-bottom: 14px;
+}
+.identity-field label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+.identity-field input[type="text"] {
+  width: 100%;
+  max-width: 420px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+#copyCitizenCardBtn {
+  margin-left: 0;
+}
+#copyCitizenCardBtn.copied {
+  background: var(--gold-bright, var(--gold));
+}
+#citizenCardSource {
+  width: 100%;
+  min-height: 260px;
+  margin-top: 10px;
+  font-family: monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--ink);
+  box-sizing: border-box;
+  resize: vertical;
+}

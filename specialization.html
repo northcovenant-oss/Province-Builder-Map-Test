@@ -48,6 +48,8 @@
       <div class="step-dot" data-step="3"><span class="step-num">3</span><span class="step-label">Production</span></div>
       <div class="step-connector"></div>
       <div class="step-dot" data-step="4"><span class="step-num">4</span><span class="step-label">Population</span></div>
+      <div class="step-connector"></div>
+      <div class="step-dot" data-step="5"><span class="step-num">5</span><span class="step-label">Identity</span></div>
     </div>
 
     <!-- ===== Step 1: Choose 5 Specializations ===== -->
@@ -138,6 +140,31 @@
       <p class="spec-placeholder-note">(Population-adjustment formulas will go here.)</p>
     </div>
 
+    <!-- ===== Step 5: National Identity + Citizen Card BBC ===== -->
+    <div class="spec-card step-panel" id="step5" data-step-panel="5" hidden>
+      <h2>Step 5 &middot; National Identity</h2>
+      <p class="step-intro">A few finishing details, then generate your Citizen Application card - fills in
+        automatically from everything chosen so far.</p>
+
+      <div class="identity-field">
+        <label for="identityCapital">Capital</label>
+        <input type="text" id="identityCapital" placeholder="e.g. Astoria City">
+      </div>
+      <div class="identity-field">
+        <label for="identityClassification">Classification (national pre-title)</label>
+        <input type="text" id="identityClassification" placeholder="e.g. Kingdom of, The Republic of">
+      </div>
+      <div class="identity-field">
+        <label for="identityGovernment">Government Type</label>
+        <input type="text" id="identityGovernment" placeholder="e.g. Constitutional Monarchy, Parliamentary Republic">
+      </div>
+
+      <div class="quick-fill-row">
+        <button type="button" class="btn-primary" id="copyCitizenCardBtn">Copy Citizen Card BBC Code</button>
+      </div>
+      <textarea id="citizenCardSource" readonly></textarea>
+    </div>
+
     <!-- ===== Final summary, shown after Step 4 ===== -->
     <div class="spec-card step-panel" id="stepSummary" data-step-panel="summary" hidden>
       <h2>Summary</h2>
@@ -152,6 +179,10 @@
       <div class="summary-block">
         <div class="summary-label">Population Level</div>
         <div id="summaryPopLevel">&mdash;</div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">National Identity</div>
+        <div id="summaryIdentity">&mdash;</div>
       </div>
       <p class="spec-placeholder-note">This is as far as the skeleton goes for now - nothing here is saved yet.</p>
     </div>

@@ -427,8 +427,114 @@
     el.textContent = 'Your chosen specializations: ' + filled.join(', ');
   }
 
+  // ---- Step 5: National Identity + Citizen Card BBC ----
+  //
+  // Matches the community's Citizen App Card template exactly - every
+  // {{PLACEHOLDER}} below corresponds 1:1 to a "PUT X HERE" spot in the
+  // original BBC. Things this page has no data for (flag image, dispatch
+  // link, IIWiki link) are left as the original template's own literal
+  // placeholder text for the player to fill in by hand after copying.
+  const CITIZEN_CARD_TEMPLATE =
+`[pre][*][box][background-block=#FFE6E6][center][size=250][b] [nation=noflag]{{NATION}}[/nation][/b][/size]
+[img]200x100 Pixel Image of Flag here[/img]
+[u]Join Date:{{JOIN_DATE}}[/u]
+[Spoiler= More Information[DELETE ME]][table=plain][tr]
+[td][size=110]Classification:
+[b]{{CLASSIFICATION}}[/b][/size][/td]
+[td][size=110]Capital:
+[b]{{CAPITAL}}[/b][/size][/td]
+[td][size=110]Population:
+[b]{{POPULATION}}[/b][/size][/td]
+[/tr][tr]
+[td][size=110]Government Type: 
+[b]{{GOVERNMENT_TYPE}}[/b][/size][/td]
+[td][size=110]Economy Type: 
+[b]{{ECONOMY_TYPE}}[/b][/size][/td]
+[td][size=110]Gross Domestic Product: 
+[b]{{GDP}}[/b][/size][/td]
+[/tr]
+[/table]
+[table]
+[tr][td][/td][td][/td][/tr]
+[tr][td]
+[list=1][*]{{SPEC1}}[*]{{SPEC2}}[*]{{SPEC3}}[*]{{SPEC4}}[*]{{SPEC5}}[/list][/td]
+[td][list][*]Doctrine: {{PRIORITY}}
+[*]Stance: {{STANCE}}
+[*]Army: {{ARMY}}
+[*]Navy: {{NAVY}}
+[*]Air Force: {{AIR_FORCE}}
+[*]Expeditionary: {{EXPEDITIONARY}}
+[*]Paramilitary: {{PARAMILITARY}}[/list][/td]
+[/tr][/table][/spoiler[DELETE ME]]
+
+[url=DISPATCH HERE]Full Citizen Application[/url]
+[url=IIWIKI LINK (Optional but encouraged)]IIWiki Page[/url]
+[/Center][/background-block][/box][/pre]`;
+
+  function todayJoinDate(){
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return mm + '-' + dd + '-' + yy;
+  }
+
+  function buildCitizenCard(){
+    const specs = [0,1,2,3,4].map(function(i){ return chosenSpecs[i] || ''; });
+    const priorityText = chosenStance === 'Pacifist' ? 'Pacifist (no military)' : (chosenPriority || '');
+    const stanceText = chosenStance || '';
+    return CITIZEN_CARD_TEMPLATE
+      .replace('{{NATION}}', snapshot.nation || 'Nation')
+      .replace('{{JOIN_DATE}}', todayJoinDate())
+      .replace('{{CLASSIFICATION}}', document.getElementById('identityClassification').value.trim())
+      .replace('{{CAPITAL}}', document.getElementById('identityCapital').value.trim())
+      .replace('{{POPULATION}}', snapshot.population || '')
+      .replace('{{GOVERNMENT_TYPE}}', document.getElementById('identityGovernment').value.trim())
+      .replace('{{ECONOMY_TYPE}}', snapshot.economyType || '')
+      .replace('{{GDP}}', snapshot.gdp || '')
+      .replace('{{SPEC1}}', specs[0]).replace('{{SPEC2}}', specs[1]).replace('{{SPEC3}}', specs[2])
+      .replace('{{SPEC4}}', specs[3]).replace('{{SPEC5}}', specs[4])
+      .replace('{{PRIORITY}}', priorityText)
+      .replace('{{STANCE}}', stanceText)
+      .replace('{{ARMY}}', String(focusValues['Army'] || 0))
+      .replace('{{NAVY}}', String(focusValues['Navy'] || 0))
+      .replace('{{AIR_FORCE}}', String(focusValues['Air Force'] || 0))
+      .replace('{{EXPEDITIONARY}}', String(focusValues['Expeditionary Forces'] || 0))
+      .replace('{{PARAMILITARY}}', String(focusValues['Paramilitary / Militia / Gendarmes / Reserves'] || 0));
+  }
+
+  // Same copy-to-clipboard pattern used on the bio page (map.js's
+  // bindCopyButton), reimplemented here since this is a separate page.
+  function bindCopyButton(btnId, getText, label){
+    const btn = document.getElementById(btnId);
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      const text = getText();
+      function done(ok){
+        btn.textContent = ok ? 'Copied!' : 'Copy failed \u2014 select the text manually';
+        btn.classList.toggle('copied', ok);
+        setTimeout(function(){ btn.textContent = label; btn.classList.remove('copied'); }, 1800);
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+      } else {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta);
+          done(true);
+        } catch(e){ done(false); }
+      }
+    });
+  }
+  bindCopyButton('copyCitizenCardBtn', function(){
+    const text = buildCitizenCard();
+    document.getElementById('citizenCardSource').value = text;
+    return text;
+  }, 'Copy Citizen Card BBC Code');
+
   // ---- Step navigation ----
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
   let currentStep = 1;
   const backBtn = document.getElementById('backBtn');
   const nextBtn = document.getElementById('nextBtn');
@@ -450,6 +556,8 @@
       const focusComplete = chosenStance === 'Pacifist' || pointsSpent() === budget;
       enabled = doctrineChosen && focusComplete;
     }
+    // Step 5 (National Identity) is never gated - these are flavor fields,
+    // not required to see the summary.
     nextBtn.disabled = !enabled;
     const standardSetupNextBtn = document.getElementById('standardSetupNextBtn');
     if(standardSetupNextBtn) standardSetupNextBtn.disabled = !enabled;
@@ -459,11 +567,11 @@
 
   function showStep(step){
     // hide all panels
-    [1,2,3,4,'summary'].forEach(function(s){ panelFor(s).hidden = true; });
+    [1,2,3,4,5,'summary'].forEach(function(s){ panelFor(s).hidden = true; });
     panelFor(step).hidden = false;
 
     backBtn.hidden = (step === 1);
-    nextBtn.textContent = (step === 4) ? 'Finish \u2192' : 'Next \u2192';
+    nextBtn.textContent = (step === TOTAL_STEPS) ? 'Finish \u2192' : 'Next \u2192';
     if(step === 'summary'){
       nextBtn.hidden = true;
     } else {
@@ -492,6 +600,16 @@
     const popSelect = document.getElementById('specPopAdjust');
     const pct = parseInt(popSelect.value, 10);
     document.getElementById('summaryPopLevel').textContent = (pct >= 0 ? '+' : '') + pct + '%' + (pct === 0 ? ' (Stable)' : '');
+    const identityBits = [
+      document.getElementById('identityClassification').value.trim(),
+      snapshot.nation,
+    ].filter(Boolean).join(' ');
+    const capitalBit = document.getElementById('identityCapital').value.trim();
+    const govBit = document.getElementById('identityGovernment').value.trim();
+    let identitySummary = identityBits || '\u2014';
+    if(capitalBit) identitySummary += ' \u2014 Capital: ' + capitalBit;
+    if(govBit) identitySummary += ' \u2014 ' + govBit;
+    document.getElementById('summaryIdentity').textContent = identitySummary;
   }
 
   backBtn.addEventListener('click', function(){
