@@ -94,6 +94,11 @@ function computeEconomics(provinces) {
 
   const energyProduction = computeEnergyProduction(provinces);
   const foodProduction = computeFoodProduction(provinces);
+  // Rolled once here (not separately in buildBioText/buildBBCCode) for the
+  // same reason majorClimates/minorClimates are computed once above - so
+  // the on-page text and the copied BBC code always show the same result
+  // instead of two independent Math.random() rolls disagreeing.
+  const resourcesByType = rollProvinceResources(provinces);
 
   // GDP - built from each province's OWN food/energy/population values
   // (already computed above, same order as `provinces`), not the claim
@@ -102,7 +107,7 @@ function computeEconomics(provinces) {
   // Population elsewhere on the page.
   const gdp = computeGDP(provinces, foodProduction.perProvince, energyProduction.perProvince, perProvincePopulation);
 
-  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, gdp };
+  return { continents, climates, econs, topClimate, topEcon, majorClimates, minorClimates, sectorTotals, perProvinceSectors, classification, perProvincePopulation, totalPopulation, energyProduction, foodProduction, resourcesByType, gdp };
 }
 
 // Section headers in the returned text are marked with a leading "## " -
@@ -153,6 +158,11 @@ function buildBioText(provinces, econ) {
 
   bio += `## Resources & Production\n\n`;
   bio += `%%FIELD%%Energy Production|${formatEnergyProduction(econ.energyProduction.total)}\n\n`;
+  const resourceEntries = Object.entries(econ.resourcesByType);
+  if (resourceEntries.length > 0) {
+    const resourceCells = resourceEntries.map(([type, labels]) => `${type}:${labels.join(', ')}`).join('|');
+    bio += `%%TABLE%%Resources|${resourceCells}\n\n`;
+  }
   bio += `%%FIELD%%Food Production|${formatFoodProduction(econ.foodProduction.total)}\n\n`;
 
   bio += `## Stable Population\n\n`;
@@ -254,6 +264,7 @@ const BBC_TEMPLATE = `[spoiler=Land Bio] Land Bio: [nation][/nation]
 
 [b]Resources & Production[/b]:
 [list][*][u]Energy Production[/u]: {{ENERGY_PRODUCTION}}
+[*][u]Resources[/u]: {{RESOURCES}}
 [*][u]Food Production[/u]: {{FOOD_PRODUCTION}}[/list]
 
 [b]Stable Population[/b]:
@@ -296,7 +307,11 @@ function buildBBCCode(provinces, econ) {
     ? buildWorldExports(econ.classification.name, econ.sectorTotals)
     : ["", "", "", "", ""];
 
-  return BBC_TEMPLATE
+  const resourcesText = Object.entries(econ.resourcesByType)
+    .map(([type, labels]) => `${type} (${labels.join(', ')})`)
+    .join('; ');
+
+  let filled = BBC_TEMPLATE
     .replace("{{CLIMATE_BLOCK}}", climateBlock)
     .replace("{{ECON_TYPE}}", econType)
     .replace("{{ECON_TYPE_DESC}}", econTypeDesc)
@@ -310,7 +325,19 @@ function buildBBCCode(provinces, econ) {
     .replace("{{EXPORT_5}}", exports[4])
     .replace("{{POPULATION}}", formatNumber(econ.totalPopulation))
     .replace("{{ENERGY_PRODUCTION}}", formatEnergyProduction(econ.energyProduction.total))
+    .replace("{{RESOURCES}}", resourcesText)
     .replace("{{FOOD_PRODUCTION}}", formatFoodProduction(econ.foodProduction.total));
+
+  // No resource data at all (every claimed province has unknown climate -
+  // rare, but possible with the handful of sliver provinces) - drop the
+  // whole bullet line rather than leaving "Resources: " with nothing
+  // after it, matching buildBioText's behavior of omitting the section
+  // entirely in the same situation.
+  if (!resourcesText) {
+    filled = filled.replace(/\n\[\*\]\[u\]Resources\[\/u\]: \n/, "\n");
+  }
+
+  return filled;
 }
 
 // ---- climate reference data ----
@@ -972,6 +999,73 @@ function describeClimate(name) {
     "Polar": "polar and frozen",
   };
   return descriptions[name] || name.toLowerCase();
+}
+
+// ---- Energy Resources (Coal / Natural Gas / Oil / Uranium) per province ----
+//
+// Each province's specific energy resource is rolled per-generation, using
+// its climate as weighting - matches this project's existing pattern where
+// climate is a fixed province property but economy/food/energy/population
+// OUTPUTS are randomized on each "Generate" click, not baked in.
+//
+// TEMPORARY, PER USER'S OWN NOTE: this is meant to eventually be replaced
+// once the province data itself is finalized on the map - at that point,
+// each province's resource type should be rolled ONCE and hardcoded into
+// data.js (the same way climate.dominant already is), rather than
+// re-rolled every time a bio is generated. Flagging this in code as well
+// as here so it isn't lost.
+//
+// Percentages are given by the source table; the four keys per row always
+// sum to 100. Two rows in the source table (Tundra, Humid Sub-tropical)
+// don't correspond to any climate this project actually uses (its ten
+// climates are the CLIMATE_DETAILS/describeClimate keys above) and are
+// omitted here as a result. Two more needed a naming reconciliation:
+// "Continental" -> "Humid Continental" and "Tropical Wet" -> "Tropical
+// Rainforest", both used consistently as the same climate elsewhere in
+// this project under those exact names.
+const RESOURCE_WEIGHTS_BY_CLIMATE = {
+  "Polar":               { "Coal": 5,  "Natural Gas": 15, "Oil": 79, "Uranium": 1 },
+  "Sub Arctic":          { "Coal": 50, "Natural Gas": 45, "Oil": 4,  "Uranium": 1 },
+  "Highlands":           { "Coal": 0,  "Natural Gas": 10, "Oil": 89, "Uranium": 1 },
+  "Arid":                { "Coal": 5,  "Natural Gas": 10, "Oil": 84, "Uranium": 1 },
+  "Semi-Arid":           { "Coal": 10, "Natural Gas": 20, "Oil": 69, "Uranium": 1 },
+  "Mediterranean":       { "Coal": 25, "Natural Gas": 20, "Oil": 54, "Uranium": 1 },
+  "Tropical Wet Dry":    { "Coal": 10, "Natural Gas": 30, "Oil": 59, "Uranium": 1 },
+  "Humid Continental":   { "Coal": 65, "Natural Gas": 30, "Oil": 4,  "Uranium": 1 },
+  "Oceanic":             { "Coal": 25, "Natural Gas": 20, "Oil": 54, "Uranium": 1 },
+  "Tropical Rainforest": { "Coal": 5,  "Natural Gas": 5,  "Oil": 89, "Uranium": 1 },
+};
+
+// Weighted-random pick from a { label: weight } map. Weights don't need to
+// sum to any particular number - this normalizes against whatever total
+// they add up to.
+function weightedPick(weights) {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [label, w] of entries) {
+    roll -= w;
+    if (roll <= 0) return label;
+  }
+  return entries[entries.length - 1][0]; // floating-point fallback
+}
+
+// Rolls a resource type for every province with a known climate, and
+// groups the results by resource type (e.g. { "Oil": ["S9","S12"], ... })
+// for compact display - provinces with no climate data (a handful of
+// slivers, per this project's known data gaps) are skipped rather than
+// guessed at.
+function rollProvinceResources(provinces) {
+  const byResource = {};
+  provinces.forEach(p => {
+    const climate = p.climate && p.climate.dominant;
+    const weights = climate && RESOURCE_WEIGHTS_BY_CLIMATE[climate];
+    if (!weights) return;
+    const resource = weightedPick(weights);
+    if (!byResource[resource]) byResource[resource] = [];
+    byResource[resource].push(p.label);
+  });
+  return byResource;
 }
 
 // Expose globally so map.js can call it without a module bundler.
