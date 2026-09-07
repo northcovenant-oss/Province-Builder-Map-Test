@@ -68,6 +68,28 @@
 
   function specId(rank, name){ return 'spec_' + rank + '_' + name.replace(/[^a-z0-9]+/gi, '_'); }
 
+  // Fuel specializations require having a matching resource province, and
+  // climate-gated specializations (Forestry's wood types) require having
+  // a matching climate province - a player can't specialize in extracting
+  // or harvesting something their claim doesn't actually have any of.
+  // Computed once from the snapshot's per-province data. If that data
+  // isn't available at all (an older bio snapshot predating the resource/
+  // climate hand-off), every gated specialization is treated as
+  // unavailable rather than assumed to qualify, since there's no way to
+  // actually verify it.
+  const availableResources = {};
+  const availableClimates = {};
+  (snapshot.perProvinceEnergy || []).forEach(function(p){
+    if(p.resource) availableResources[p.resource] = true;
+    if(p.climate) availableClimates[p.climate] = true;
+  });
+
+  function specializationGateReason(name){
+    const status = specializationRequirementStatus(name, availableResources, availableClimates);
+    if(status === null || status === true) return null; // no requirement, or requirement met
+    return status; // e.g. "requires Oil in your claim"
+  }
+
   function buildSlot(rank){
     const label = worldExports[rank];
     const poolNames = poolsForExportLabel(label);
@@ -108,8 +130,21 @@
         input.name = 'specRank' + rank;
         input.id = id;
         input.value = name;
+
+        const gateReason = specializationGateReason(name);
+        if(gateReason){
+          input.disabled = true;
+          input.setAttribute('data-spec-gated', 'true');
+          optLabel.classList.add('disabled');
+        }
         optLabel.appendChild(input);
         optLabel.appendChild(document.createTextNode(' ' + name));
+        if(gateReason){
+          const note = document.createElement('span');
+          note.className = 'resource-gate-note';
+          note.textContent = ' (' + gateReason + ')';
+          optLabel.appendChild(note);
+        }
         optionsDiv.appendChild(optLabel);
       });
     });
@@ -192,6 +227,10 @@
     for(let r = 0; r < 5; r++){ chosenSpecs[r] = null; }
     specSlotsEl.querySelectorAll('input[type="radio"]').forEach(function(radio){
       radio.checked = false;
+      // Resource-gated radios (a Fuel specialization with no matching
+      // province in this claim) stay disabled through a reroll - they're
+      // not eligible regardless of what else is chosen.
+      if(radio.getAttribute('data-spec-gated') === 'true') return;
       radio.disabled = false;
       radio.closest('.spec-option').classList.remove('disabled');
     });
@@ -207,6 +246,7 @@
         (SPECIALIZATION_POOLS[poolName] || []).forEach(function(name){ candidates.push(name); });
       });
       candidates = candidates.filter(function(name){ return chosenSpecs.indexOf(name) === -1; });
+      candidates = candidates.filter(function(name){ return !specializationGateReason(name); });
       if(lastMarketMap){
         const lessCrowded = candidates.filter(function(name){
           const status = lastMarketMap[name.toLowerCase()];
@@ -238,9 +278,10 @@
   function refreshDuplicateState(){
     const chosenSet = new Set(chosenSpecs.filter(Boolean));
     specSlotsEl.querySelectorAll('input[type="radio"]').forEach(function(radio){
+      const isSpecGated = radio.getAttribute('data-spec-gated') === 'true';
       const isChosenElsewhere = !radio.checked && chosenSet.has(radio.value);
-      radio.disabled = isChosenElsewhere;
-      radio.closest('.spec-option').classList.toggle('disabled', isChosenElsewhere);
+      radio.disabled = isSpecGated || isChosenElsewhere;
+      radio.closest('.spec-option').classList.toggle('disabled', isSpecGated || isChosenElsewhere);
     });
   }
 

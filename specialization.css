@@ -326,6 +326,11 @@ body.spec-page {
 .spec-option input { flex: 0 0 auto; }
 .spec-option.disabled { opacity: 0.4; cursor: not-allowed; }
 .spec-option.disabled:hover { background: none; }
+.resource-gate-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
 
 /* ---- Market Saturation badges + legend ---- */
 .market-badge {

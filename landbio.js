@@ -47,18 +47,22 @@ function generateLandBio(provinces) {
   }
 
   const economics = computeEconomics(provinces);
-  // Per-province energy value paired with that same province's rolled
-  // resource type (Coal/Natural Gas/Oil/Uranium) - used on the
-  // specialization page to apply Fuel specialization multipliers to only
-  // the matching provinces, not the claim's whole energy total.
+  // Per-province energy value, rolled resource type (Coal/Natural Gas/Oil/
+  // Uranium), and climate - used on the specialization page to gate/apply
+  // both Fuel specialization multipliers (resource-based) and climate-
+  // gated specializations like Forestry's wood types, keyed to whichever
+  // provinces actually qualify rather than the claim as a whole.
   const resourceByLabel = {};
   Object.entries(economics.resourcesByType).forEach(([type, labels]) => {
     labels.forEach(label => { resourceByLabel[label] = type; });
   });
+  const climateByLabel = {};
+  provinces.forEach(p => { climateByLabel[p.label] = (p.climate && p.climate.dominant) || null; });
   const perProvinceEnergy = economics.energyProduction.perProvince.map(p => ({
     label: p.label,
     energy: p.value,
     resource: resourceByLabel[p.label] || null,
+    climate: climateByLabel[p.label] || null,
   }));
 
   return {

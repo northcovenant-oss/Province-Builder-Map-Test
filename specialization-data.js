@@ -18,11 +18,20 @@ const SPECIALIZATION_POOLS = {
     "Agriculture - Animal & Vegetable Bi-Products",
     "Agriculture - Carbohydrate Products",
     "Agriculture - Fruits",
+    "Agriculture - Sugar",
     "Agriculture - Vegetables",
     "Fishing - Aquaculture",
     "Fishing - Commercial",
-    "Forestry",
-    "Mining",
+    "Fishing - Pearling",
+    "Forestry - Hard Wood",
+    "Forestry - Soft Wood",
+    "Forestry - Rubber",
+    "Forestry - Tropical Hardwood",
+    "Mining - Precious Metals",
+    "Mining - Base Metals",
+    "Mining - Precious Stones",
+    "Mining - Rare Earth Elements",
+    "Mining - Industrial Minerals",
     "Fuel - Coal Mining",
     "Fuel - Natural Gas Extraction",
     "Fuel - Petroleum Extraction",
@@ -109,7 +118,10 @@ const SPECIALIZATION_POOLS = {
     "Defense - Military Vehicles",
     "Defense - Ships",
     "Defense - Submarines",
+    "Electronics - Computing",
+    "Electronics - Industrial",
     "Electronics - Semiconductor",
+    "Electronics - Telecommunication",
     "Energy - Nuclear",
     "Energy - Renewable",
     "Energy - Fossil Fuels",
@@ -127,7 +139,6 @@ const SPECIALIZATION_POOLS = {
     "Shipbuilding - Commercial Large",
     "Shipbuilding - Commercial Small",
     "Shipbuilding - Private",
-    "Telecommunication",
     "Waste - Disposal",
     "Waste - Recycling",
   ],
@@ -267,6 +278,47 @@ const FUEL_SPEC_TO_RESOURCE = {
 };
 // Index 0 = 1st rank, index 4 = 5th rank.
 const FUEL_MULTIPLIER_BY_RANK = [2.5, 2.25, 2, 1.75, 1.5];
+
+// ---- Climate-gated specializations ----
+//
+// Some specializations only make sense given the right climate somewhere
+// in the claim - Forestry's wood types being the clearest case (a
+// softwood-timber industry needs actual softwood forest, not just any
+// land). Keyed to real-world forestry geography as a reasonable basis:
+// softwood = cold/temperate coniferous forest, hardwood = temperate
+// broadleaf forest, tropical hardwood = teak/mahogany-type tropical
+// timber, rubber wood = rubber tree habitat (tropical, wetter). A
+// specialization qualifies if the claim has AT LEAST ONE province in ANY
+// of its listed climates - it doesn't need to dominate the claim.
+const CLIMATE_SPEC_REQUIREMENTS = {
+  "Forestry - Soft Wood":         ["Sub Arctic", "Highlands", "Oceanic", "Humid Continental"],
+  "Forestry - Hard Wood":         ["Humid Continental", "Oceanic", "Mediterranean"],
+  "Forestry - Tropical Hardwood": ["Tropical Rainforest"],
+  "Forestry - Rubber":            ["Tropical Rainforest", "Tropical Wet Dry"],
+};
+
+// General-purpose "does this specialization's requirement check out"
+// function, covering both kinds of requirement this page enforces: a
+// Fuel specialization needing a matching rolled resource somewhere in the
+// claim, and a climate-gated specialization (Forestry's wood types)
+// needing a matching climate somewhere in the claim. Returns null if the
+// specialization has no requirement at all (nothing to check), or a short
+// requirement description string if it does but isn't met, or true if it
+// has a requirement and DOES meet it (so callers can tell "no requirement"
+// apart from "requirement met").
+function specializationRequirementStatus(name, availableResources, availableClimates){
+  const resource = FUEL_SPEC_TO_RESOURCE[name];
+  if(resource){
+    return availableResources[resource] ? true : ('requires ' + resource + ' in your claim');
+  }
+  const climates = CLIMATE_SPEC_REQUIREMENTS[name];
+  if(climates){
+    const met = climates.some(function(c){ return availableClimates[c]; });
+    if(met) return true;
+    return 'requires ' + (climates.length === 1 ? climates[0] : climates.join(' or ')) + ' climate in your claim';
+  }
+  return null; // no requirement at all
+}
 
 const ENERGY_SPEC_NAMES = ["Energy - Nuclear", "Energy - Renewable", "Energy - Fossil Fuels"];
 const ENERGY_FLAT_BONUS_BY_RANK = [125, 100, 75, 50, 25];
