@@ -153,9 +153,41 @@
     return index;
   }
 
+  // Diagnostic helper - fetches the sheet and dumps exactly what row 2 and
+  // row 20 (plus a few neighbors) actually contain, so a layout mismatch
+  // can be spotted directly instead of guessed at. Run in the console:
+  //   window.ClaimsStore.debugDump()
+  function debugDump() {
+    if (typeof fetch !== "function") {
+      console.warn("[ClaimsStore] fetch() is not available.");
+      return;
+    }
+    fetch(CLAIMS_SHEET_CSV_URL, { cache: "no-store" })
+      .then(function (res) {
+        console.log("[ClaimsStore debug] HTTP status:", res.status, res.ok ? "(ok)" : "(NOT ok)");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (csvText) {
+        const rows = csvText.split(/\r?\n/).map(parseCsvLine);
+        console.log("[ClaimsStore debug] Total rows in sheet:", rows.length);
+        console.log("[ClaimsStore debug] First 400 chars of raw response:", csvText.slice(0, 400));
+        console.log("[ClaimsStore debug] Row 1 (index 0):", rows[0]);
+        console.log("[ClaimsStore debug] Row 2 (index 1) - expected nation names:", rows[1]);
+        console.log("[ClaimsStore debug] Row 3 (index 2):", rows[2]);
+        console.log("[ClaimsStore debug] Row 19 (index 18):", rows[18]);
+        console.log("[ClaimsStore debug] Row 20 (index 19) - expected claim codes:", rows[19]);
+        console.log("[ClaimsStore debug] Row 21 (index 20):", rows[20]);
+      })
+      .catch(function (e) {
+        console.warn("[ClaimsStore debug] Fetch/parse failed:", e.message);
+      });
+  }
+
   window.ClaimsStore = {
     loadClaims: loadClaims,
     buildProvinceIndex: buildProvinceIndex,
+    debugDump: debugDump,
     VERSION: "2026-09-07-row-based-rebuild",
   };
 })();
