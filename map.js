@@ -605,7 +605,8 @@
       '    <div class="bio-body">' + bodyHtml + '</div>\n' +
       (loading ? '' : '    <div class="bio-actions"><button id="continueToSpecBtn" class="btn-primary">Continue to National Specialization &rarr;</button>' +
                        '<button id="copyBbcBtn">Copy BBC Code</button></div>\n' +
-                       '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n') +
+                       '    <textarea id="bbcSource" readonly>' + escapeHtml(bbcCode) + '</textarea>\n' +
+                       '    <script type="application/json" id="perProvinceEnergyData">' + JSON.stringify((result && result.perProvinceEnergy) || []) + '</script>\n') +
       '    <div class="claim-code-block">\n' +
       '      <div class="cc-title">Claim Code &mdash; paste this into "Load a Claim Code" on the map to recreate this exact selection</div>\n' +
       '      <div class="claim-code-value" id="claimCodeValue">' + escapeHtml(claimCode) + '</div>\n' +
@@ -672,6 +673,7 @@
       '          foodProduction: fieldValue("Food Production"),\n' +
       '          worldExports: worldExportsRanking(),\n' +
       '          claimCode: (function(){ var el = document.getElementById("claimCodeValue"); return el ? el.textContent.trim() : ""; })(),\n' +
+      '          perProvinceEnergy: (function(){ var el = document.getElementById("perProvinceEnergyData"); try { return el ? JSON.parse(el.textContent) : []; } catch(e){ return []; } })(),\n' +
       '        };\n' +
       '        try {\n' +
       '          localStorage.setItem("landClaimSpecializationSnapshot", JSON.stringify(snapshot));\n' +

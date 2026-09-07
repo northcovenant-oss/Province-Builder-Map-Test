@@ -96,16 +96,18 @@
     <!-- ===== Step 3: Adjust Energy/Agricultural Production ===== -->
     <div class="spec-card step-panel" id="step3" data-step-panel="3" hidden>
       <h2>Step 3 &middot; Adjust Energy &amp; Agricultural Production</h2>
-      <p class="step-intro">Your chosen specializations may let you shift these figures. This step is a placeholder for now - no formulas are wired up yet.</p>
+      <p class="step-intro">Your chosen specializations shift these figures automatically. Food Production
+        adjustments aren't wired up yet - Energy Production below reflects your actual picks.</p>
       <div class="spec-chosen-summary" id="chosenSummary"><!-- populated by specialization.js --></div>
       <div class="adjust-row">
         <div class="adjust-field">
           <label>Energy Production</label>
-          <div class="adjust-controls">
-            <button class="adjust-btn" disabled>&minus;</button>
+          <div class="adjust-result">
+            <span class="adjust-original" id="adjEnergyOriginal">&mdash;</span>
+            <span class="adjust-arrow">&rarr;</span>
             <span class="adjust-value" id="adjEnergyValue">&mdash;</span>
-            <button class="adjust-btn" disabled>+</button>
           </div>
+          <div class="adjust-breakdown" id="adjEnergyBreakdown"><!-- populated by specialization.js --></div>
         </div>
         <div class="adjust-field">
           <label>Food Production</label>
@@ -116,7 +118,7 @@
           </div>
         </div>
       </div>
-      <p class="spec-placeholder-note">(Adjustment formulas based on your chosen specializations will go here.)</p>
+      <p class="spec-placeholder-note">(Food Production adjustment formulas will go here.)</p>
     </div>
 
     <!-- ===== Step 4: Adjust Population ===== -->

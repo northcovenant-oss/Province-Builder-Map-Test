@@ -39,7 +39,6 @@
   document.getElementById('snapEnergy').textContent = snapshot.energyProduction || '\u2014';
   document.getElementById('snapFood').textContent = snapshot.foodProduction || '\u2014';
   document.getElementById('step1EconomyType').textContent = snapshot.economyType || '\u2014';
-  document.getElementById('adjEnergyValue').textContent = snapshot.energyProduction || '\u2014';
   document.getElementById('adjFoodValue').textContent = snapshot.foodProduction || '\u2014';
 
   // ---- Step 1: one slot per World Exports rank, tied to that rank's sector ----
@@ -437,6 +436,60 @@
     el.textContent = 'Your chosen specializations: ' + filled.join(', ');
   }
 
+  // Matches landbio.js's formatSigned/energyStatusLabel/formatEnergyProduction
+  // exactly (rounding, sign, status-label thresholds), so the number shown
+  // here always reads the same way it does on the bio page.
+  function formatEnergyValue(n){
+    const rounded = Math.round(n);
+    const sign = rounded >= 0 ? '+' : '';
+    const label = rounded < 0 ? 'Energy Dependent' : rounded > 0 ? 'Energy Surplus' : 'Energy Balanced';
+    return sign + rounded + ' ' + label;
+  }
+
+  function ordinal(n){
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function renderEnergyAdjustment(){
+    const perProvinceEnergy = snapshot.perProvinceEnergy || [];
+    const originalEl = document.getElementById('adjEnergyOriginal');
+    const valueEl = document.getElementById('adjEnergyValue');
+    const breakdownEl = document.getElementById('adjEnergyBreakdown');
+
+    if(perProvinceEnergy.length === 0){
+      const fallback = snapshot.energyProduction || '\u2014';
+      originalEl.textContent = fallback;
+      valueEl.textContent = fallback;
+      breakdownEl.textContent = 'Per-province data isn\u2019t available for this claim (an older bio snapshot, ' +
+        'most likely), so specialization adjustments can\u2019t be calculated - showing the original total unchanged.';
+      return;
+    }
+
+    const result = applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs);
+    originalEl.textContent = formatEnergyValue(result.originalTotal);
+    valueEl.textContent = formatEnergyValue(result.adjustedTotal);
+
+    breakdownEl.innerHTML = '';
+    result.appliedFuelBonuses.forEach(function(b){
+      const line = document.createElement('span');
+      line.className = 'breakdown-item';
+      line.textContent = b.spec + ' (' + ordinal(b.rank) + ') \u2014 ' + b.multiplier + '\u00d7 on ' +
+        b.resource + ' provinces: ' + (b.provinces.length ? b.provinces.join(', ') : 'none in this claim');
+      breakdownEl.appendChild(line);
+    });
+    result.appliedEnergyBonuses.forEach(function(b){
+      const line = document.createElement('span');
+      line.className = 'breakdown-item';
+      line.textContent = b.spec + ' (' + ordinal(b.rank) + ') \u2014 +' + b.bonus + ' flat';
+      breakdownEl.appendChild(line);
+    });
+    if(result.appliedFuelBonuses.length === 0 && result.appliedEnergyBonuses.length === 0){
+      breakdownEl.textContent = 'No Fuel or Energy specialization chosen - total is unchanged.';
+    }
+  }
+
   // ---- Step 5: National Identity + Citizen Card BBC ----
   //
   // Matches the community's Citizen App Card template exactly - every
@@ -631,7 +684,7 @@
       dot.classList.toggle('done', step === 'summary' || dotStep < step);
     });
 
-    if(step === 3) renderChosenSummary();
+    if(step === 3){ renderChosenSummary(); renderEnergyAdjustment(); }
     if(step === 'summary') renderFinalSummary();
     updateNextButtonState();
   }

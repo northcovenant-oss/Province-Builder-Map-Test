@@ -43,13 +43,28 @@
 
 function generateLandBio(provinces) {
   if (!provinces || provinces.length === 0) {
-    return { text: "No provinces claimed yet.", bbcCode: "" };
+    return { text: "No provinces claimed yet.", bbcCode: "", perProvinceEnergy: [] };
   }
 
   const economics = computeEconomics(provinces);
+  // Per-province energy value paired with that same province's rolled
+  // resource type (Coal/Natural Gas/Oil/Uranium) - used on the
+  // specialization page to apply Fuel specialization multipliers to only
+  // the matching provinces, not the claim's whole energy total.
+  const resourceByLabel = {};
+  Object.entries(economics.resourcesByType).forEach(([type, labels]) => {
+    labels.forEach(label => { resourceByLabel[label] = type; });
+  });
+  const perProvinceEnergy = economics.energyProduction.perProvince.map(p => ({
+    label: p.label,
+    energy: p.value,
+    resource: resourceByLabel[p.label] || null,
+  }));
+
   return {
     text: buildBioText(provinces, economics),
     bbcCode: buildBBCCode(provinces, economics),
+    perProvinceEnergy,
   };
 }
 

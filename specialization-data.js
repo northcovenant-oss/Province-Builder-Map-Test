@@ -250,6 +250,69 @@ const MILITARY_BRANCHES = [
 
 const SPECIALIZATION_COUNT = 5;
 
+// ---- Energy Production adjustments from chosen specializations ----
+//
+// A Fuel specialization multiplies the Energy Production of whichever
+// provinces rolled that same fuel type as their resource (see
+// landbio.js's rollProvinceResources / RESOURCE_WEIGHTS_BY_CLIMATE) - not
+// the claim's whole energy total. An Energy specialization instead adds a
+// flat bonus to the total, regardless of which provinces have which
+// resource. Both are keyed by RANK (which of the 5 export slots the
+// specialization was chosen for), 1st being the strongest.
+const FUEL_SPEC_TO_RESOURCE = {
+  "Fuel - Coal Mining": "Coal",
+  "Fuel - Natural Gas Extraction": "Natural Gas",
+  "Fuel - Petroleum Extraction": "Oil",
+  "Fuel - Uranium Extraction": "Uranium",
+};
+// Index 0 = 1st rank, index 4 = 5th rank.
+const FUEL_MULTIPLIER_BY_RANK = [2.5, 2.25, 2, 1.75, 1.5];
+
+const ENERGY_SPEC_NAMES = ["Energy - Nuclear", "Energy - Renewable", "Energy - Fossil Fuels"];
+const ENERGY_FLAT_BONUS_BY_RANK = [125, 100, 75, 50, 25];
+
+// Applies both adjustments to a claim's per-province energy breakdown.
+// perProvinceEnergy: [{ label, energy, resource }, ...] (from the bio
+// page's snapshot hand-off). chosenSpecs: the 5 export-rank picks, in
+// order (chosenSpecs[0] is 1st, etc. - may contain nulls for unfilled
+// slots). Returns { adjustedTotal, originalTotal, appliedFuelBonuses,
+// appliedEnergyBonuses } - the two "applied" arrays are for showing the
+// player what actually kicked in, not just the final number.
+function applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs){
+  const originalTotal = perProvinceEnergy.reduce((sum, p) => sum + p.energy, 0);
+  // Work on a copy keyed by label so multiple Fuel specs (unlikely to
+  // both match the same province, but not impossible) compound correctly
+  // rather than each recomputing from the original value.
+  const working = {};
+  perProvinceEnergy.forEach(p => { working[p.label] = p.energy; });
+
+  const appliedFuelBonuses = [];
+  const appliedEnergyBonuses = [];
+  let flatBonusTotal = 0;
+
+  (chosenSpecs || []).forEach((spec, i) => {
+    if (!spec) return;
+    const rank = i + 1;
+    const resource = FUEL_SPEC_TO_RESOURCE[spec];
+    if (resource) {
+      const multiplier = FUEL_MULTIPLIER_BY_RANK[i];
+      const matching = perProvinceEnergy.filter(p => p.resource === resource);
+      matching.forEach(p => { working[p.label] = p.energy * multiplier; });
+      appliedFuelBonuses.push({ spec, rank, resource, multiplier, provinces: matching.map(p => p.label) });
+      return;
+    }
+    if (ENERGY_SPEC_NAMES.indexOf(spec) !== -1) {
+      const bonus = ENERGY_FLAT_BONUS_BY_RANK[i];
+      flatBonusTotal += bonus;
+      appliedEnergyBonuses.push({ spec, rank, bonus });
+    }
+  });
+
+  const adjustedTotal = Object.values(working).reduce((sum, v) => sum + v, 0) + flatBonusTotal;
+  return { adjustedTotal, originalTotal, appliedFuelBonuses, appliedEnergyBonuses };
+}
+
+
 // Maps a World Exports rank's sector label (from landbio.js's
 // buildWorldExports - "Services", "Consumer Goods", "Industrial Goods",
 // "Raw Materials", combinations like "Services or Raw Materials", or
