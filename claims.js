@@ -35,8 +35,15 @@
  */
 
 (function () {
+  // Using the GViz (Google Visualization) endpoint rather than the plain
+  // /export?format=csv one - the /export endpoint threw a NetworkError
+  // when actually deployed (almost certainly a CORS issue: Google doesn't
+  // reliably send Access-Control-Allow-Origin on that endpoint for
+  // cross-origin fetches from an arbitrary domain like GitHub Pages).
+  // gviz/tq is specifically built for external/embedded consumption of a
+  // public sheet and has more consistent CORS support.
   const CLAIMS_SHEET_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/export?format=csv&gid=1336017158";
+    "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/gviz/tq?tqx=out:csv&gid=1336017158";
   const NATION_ROW_INDEX = 1;       // row 2 (0-indexed)
   const CLAIM_CODE_ROW_INDEX = 19;  // row 20 (0-indexed)
   const FIRST_DATA_COLUMN = 1;      // column B (0-indexed) - column A assumed to be a row label
