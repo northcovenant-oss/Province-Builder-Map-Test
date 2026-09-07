@@ -3,36 +3,43 @@
  * -------------
  * Used by index.html to grey out/lock already-claimed provinces on the map.
  *
- * Reads live from the community's "Rylet Land Bio Data" Google Sheet, FR
- * (Form Responses) tab - column B holds the nation name, column T holds
- * the claim code, one row per submission. This replaces the previous
- * static claims.json approach (and the Admin Page that maintained it,
- * both retired): a claim becomes visible to everyone the moment it's
- * submitted to the sheet, with no file to push and no redeploy to wait on.
+ * Reads live from the community's claims-tracking Google Sheet - reversed
+ * from a typical spreadsheet layout: instead of one row per nation with a
+ * column per field, this sheet runs sideways. Row 2 holds every nation's
+ * name, one per column; row 20 holds the matching claim code, in the SAME
+ * column position (column C's name pairs with column C's claim code, and
+ * so on). Column A is assumed to be a row label ("Nation" / "Claim Code"),
+ * not actual data - real entries start at column B. Flag if that's wrong.
  *
- * Each claim record returned looks like:
- *   { id: "row-4", name: "Astoria", provinces: ["S9","S12","N4"], capital: "S9", dateAdded: "..." }
+ * Each claim record returned:
+ *   { id: "col-2", name: "Testlandia", provinces: ["S9","S12"], capital: "S9", dateAdded: null }
  *
  * `capital` is the label of one of the entries in `provinces`, or null if
- * no capital was marked - a trailing "*" on a label in the sheet's Claim
- * Code column marks it, the same convention the bio page's own Claim
- * Code box uses, so a code copied from there parses identically here.
+ * no capital was marked - a trailing "*" on a label in the claim code
+ * marks it, the same convention the bio page's own Claim Code box uses.
  *
- * NOTE: this fetches a public URL from the browser at page-load time: I
- * couldn't run a live end-to-end test of this exact call from a real
- * browser (no external network access in the environment I built this
- * in) - the parsing/transform logic below is verified against the
- * sheet's actual real data, and the CSV export URL follows Google's
- * standard public-sheet pattern (the same one already used successfully
- * for the Market Saturation feature on the Specialization page), but
- * please confirm the live page pulls correctly once deployed.
+ * DIAGNOSTICS: unlike the previous version, this one always logs to the
+ * console - a success line with how many claims it found, or a warning
+ * with the specific failure reason - so checking whether this is working
+ * doesn't require manually calling anything in DevTools. Also exposes
+ * window.ClaimsStore.VERSION so a stale cached copy can be spotted at a
+ * glance (console.log(window.ClaimsStore.VERSION)).
+ *
+ * NOTE: this fetches a public URL from the browser at page-load time. I
+ * could not verify this exact sheet/layout myself - my fetch tool got
+ * stuck serving a cached snapshot of a different tab in this same
+ * document regardless of which URL I requested, so I was not able to
+ * confirm column A's contents or the live data directly. Please verify
+ * the live page against the actual sheet and let me know if anything
+ * about the layout is different from what's described above.
  */
 
 (function () {
   const CLAIMS_SHEET_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/export?format=csv&gid=113158919";
-  const NATION_COLUMN = 1;      // column B
-  const CLAIM_CODE_COLUMN = 19; // column T
+    "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/export?format=csv&gid=1336017158";
+  const NATION_ROW_INDEX = 1;       // row 2 (0-indexed)
+  const CLAIM_CODE_ROW_INDEX = 19;  // row 20 (0-indexed)
+  const FIRST_DATA_COLUMN = 1;      // column B (0-indexed) - column A assumed to be a row label
 
   // Minimal CSV row parser (handles quoted fields, escaped quotes) - no
   // external library, same approach used for the Market Saturation sheet.
@@ -80,15 +87,12 @@
   }
 
   function loadClaims() {
-    // Guard against fetch() itself being unavailable (very old browsers, or
-    // some restricted embedded contexts) - calling an undefined function
-    // throws synchronously, which a .catch() further down the chain can't
-    // intercept, and an uncaught error here would abort map.js entirely,
-    // breaking far more than just claim-locking. Wrapping the whole thing
-    // in try/catch makes this fail safe no matter where it goes wrong.
+    // Guard against fetch() itself being unavailable, and against any
+    // other synchronous throw - an uncaught error here would abort
+    // map.js entirely, breaking far more than just claim-locking.
     try {
       if (typeof fetch !== "function") {
-        console.warn("fetch() is not available - skipping the claims sheet.");
+        console.warn("[ClaimsStore] fetch() is not available - skipping the claims sheet.");
         return Promise.resolve([]);
       }
       const byLabel = {};
@@ -101,42 +105,44 @@
         })
         .then(function (csvText) {
           const rows = csvText.split(/\r?\n/).map(parseCsvLine);
+          const nameRow = rows[NATION_ROW_INDEX] || [];
+          const claimCodeRow = rows[CLAIM_CODE_ROW_INDEX] || [];
           const claims = [];
-          // Row 0 is the header ("Timestamp", "Nation", ... "Claim Code").
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length <= CLAIM_CODE_COLUMN) continue;
-            const name = (row[NATION_COLUMN] || "").trim();
-            const claimCodeRaw = (row[CLAIM_CODE_COLUMN] || "").trim();
+          const lastCol = Math.max(nameRow.length, claimCodeRow.length);
+          for (let col = FIRST_DATA_COLUMN; col < lastCol; col++) {
+            const name = (nameRow[col] || "").trim();
+            const claimCodeRaw = (claimCodeRow[col] || "").trim();
             if (!name || !claimCodeRaw) continue;
             const parsed = parseClaimCode(claimCodeRaw, byLabel);
             if (parsed.provinces.length === 0) continue;
             claims.push({
-              id: "row-" + i,
+              id: "col-" + col,
               name: name,
               provinces: parsed.provinces,
               capital: parsed.capital,
-              dateAdded: (row[0] || "").trim() || null,
+              dateAdded: null,
             });
           }
+          console.log("[ClaimsStore] Loaded " + claims.length + " claim(s): " +
+            claims.map(function (c) { return c.name; }).join(", "));
           return claims;
         })
         .catch(function (e) {
           // Network error, sheet moved/became private, or unexpected
           // format - fail quietly to an empty list rather than breaking
-          // the page.
-          console.warn("Could not load claims from the Google Sheet:", e.message);
+          // the page, but always log why.
+          console.warn("[ClaimsStore] Could not load claims from the sheet:", e.message);
           return [];
         });
     } catch (e) {
-      console.warn("Could not load claims from the Google Sheet:", e.message);
+      console.warn("[ClaimsStore] Could not load claims from the sheet:", e.message);
       return Promise.resolve([]);
     }
   }
 
   // Builds a lookup of provinceId -> claim record, for every province
   // across every claim. Two claims should never contain the same
-  // province, but if the sheet ever has an overlap, the later row wins.
+  // province, but if the sheet ever has an overlap, the later column wins.
   function buildProvinceIndex(claims) {
     const index = {};
     claims.forEach(function (claim) {
@@ -147,5 +153,9 @@
     return index;
   }
 
-  window.ClaimsStore = { loadClaims, buildProvinceIndex };
+  window.ClaimsStore = {
+    loadClaims: loadClaims,
+    buildProvinceIndex: buildProvinceIndex,
+    VERSION: "2026-09-07-row-based-rebuild",
+  };
 })();
