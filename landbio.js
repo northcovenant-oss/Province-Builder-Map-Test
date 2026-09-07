@@ -1077,6 +1077,11 @@ function weightedPick(weights) {
 function rollProvinceResources(provinces) {
   const byResource = {};
   provinces.forEach(p => {
+    // Only Energy-type provinces actually produce a specific fuel
+    // resource - a Service Focused or Agriculture Oriented province
+    // shouldn't come up as sitting on Coal/Oil/etc. just because its
+    // climate would statistically favor it.
+    if (p.econ !== "Energy Focused" && p.econ !== "Energy Oriented") return;
     const climate = p.climate && p.climate.dominant;
     const weights = climate && RESOURCE_WEIGHTS_BY_CLIMATE[climate];
     if (!weights) return;

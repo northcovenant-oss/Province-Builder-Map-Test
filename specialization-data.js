@@ -284,17 +284,21 @@ const FUEL_MULTIPLIER_BY_RANK = [2.5, 2.25, 2, 1.75, 1.5];
 // Some specializations only make sense given the right climate somewhere
 // in the claim - Forestry's wood types being the clearest case (a
 // softwood-timber industry needs actual softwood forest, not just any
-// land). Keyed to real-world forestry geography as a reasonable basis:
-// softwood = cold/temperate coniferous forest, hardwood = temperate
-// broadleaf forest, tropical hardwood = teak/mahogany-type tropical
-// timber, rubber wood = rubber tree habitat (tropical, wetter). A
-// specialization qualifies if the claim has AT LEAST ONE province in ANY
-// of its listed climates - it doesn't need to dominate the claim.
+// land). Keyed to real-world geography as a reasonable basis: softwood =
+// cold/temperate coniferous forest, hardwood = temperate broadleaf
+// forest, tropical hardwood = teak/mahogany-type tropical timber, rubber
+// wood = rubber tree habitat (tropical, wetter). Pearling uses the same
+// tropical/wet climates as rubber wood - pearl oysters need warm coastal
+// water, the closest proxy this project has without a coastal/landlocked
+// province flag. A specialization qualifies if the claim has AT LEAST ONE
+// province in ANY of its listed climates - it doesn't need to dominate
+// the claim.
 const CLIMATE_SPEC_REQUIREMENTS = {
   "Forestry - Soft Wood":         ["Sub Arctic", "Highlands", "Oceanic", "Humid Continental"],
   "Forestry - Hard Wood":         ["Humid Continental", "Oceanic", "Mediterranean"],
   "Forestry - Tropical Hardwood": ["Tropical Rainforest"],
   "Forestry - Rubber":            ["Tropical Rainforest", "Tropical Wet Dry"],
+  "Fishing - Pearling":           ["Tropical Rainforest", "Tropical Wet Dry"],
 };
 
 // General-purpose "does this specialization's requirement check out"
