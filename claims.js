@@ -3,13 +3,14 @@
  * -------------
  * Used by index.html to grey out/lock already-claimed provinces on the map.
  *
- * Reads live from the community's claims-tracking Google Sheet - reversed
- * from a typical spreadsheet layout: instead of one row per nation with a
- * column per field, this sheet runs sideways. Row 2 holds every nation's
- * name, one per column; row 20 holds the matching claim code, in the SAME
- * column position (column C's name pairs with column C's claim code, and
- * so on). Column A is assumed to be a row label ("Nation" / "Claim Code"),
- * not actual data - real entries start at column B. Flag if that's wrong.
+ * Reads live from the community's "Admin Post" Google Sheet tab via its
+ * "Publish to the web" CSV feed - reversed from a typical spreadsheet
+ * layout: instead of one row per nation with a column per field, this
+ * sheet runs sideways. Row 2 holds every nation's name, one per column;
+ * row 20 holds the matching claim code, in the SAME column position
+ * (column C's name pairs with column C's claim code, and so on). Column A
+ * is assumed to be a row label ("Nation" / "Claim Code"), not actual
+ * data - real entries start at column B. Flag if that's wrong.
  *
  * Each claim record returned:
  *   { id: "col-2", name: "Testlandia", provinces: ["S9","S12"], capital: "S9", dateAdded: null }
@@ -25,25 +26,27 @@
  * window.ClaimsStore.VERSION so a stale cached copy can be spotted at a
  * glance (console.log(window.ClaimsStore.VERSION)).
  *
- * NOTE: this fetches a public URL from the browser at page-load time. I
- * could not verify this exact sheet/layout myself - my fetch tool got
- * stuck serving a cached snapshot of a different tab in this same
- * document regardless of which URL I requested, so I was not able to
- * confirm column A's contents or the live data directly. Please verify
- * the live page against the actual sheet and let me know if anything
- * about the layout is different from what's described above.
+ * NOTE: this fetches a public URL from the browser at page-load time. The
+ * plain /export?format=csv endpoint threw a NetworkError once actually
+ * deployed (a CORS issue, near-certainly), so this now uses the sheet's
+ * "Publish to the web" CSV feed instead - Google's own purpose-built
+ * mechanism for exactly this kind of external consumption. I still can't
+ * verify the live fetch or the sheet's exact layout myself (no external
+ * network access in the environment I work in), so please confirm the
+ * live page picks this up correctly.
  */
 
 (function () {
-  // Using the GViz (Google Visualization) endpoint rather than the plain
-  // /export?format=csv one - the /export endpoint threw a NetworkError
-  // when actually deployed (almost certainly a CORS issue: Google doesn't
-  // reliably send Access-Control-Allow-Origin on that endpoint for
-  // cross-origin fetches from an arbitrary domain like GitHub Pages).
-  // gviz/tq is specifically built for external/embedded consumption of a
-  // public sheet and has more consistent CORS support.
+  // "Publish to the web" URL for the Admin Post tab (File > Share >
+  // Publish to web > select this tab > CSV). This is Google's own
+  // purpose-built mechanism for exactly this kind of public, external
+  // consumption, and has the most reliable CORS support of the three
+  // approaches tried here - the plain /export?format=csv endpoint threw a
+  // NetworkError when actually deployed (a CORS issue, near-certainly),
+  // and while gviz/tq was tried as a fallback, this published URL should
+  // supersede both.
   const CLAIMS_SHEET_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/gviz/tq?tqx=out:csv&gid=1336017158";
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7W_8C-QWQO6AmHUYrvI4FdlyTMRV3qe65QIF-abGoH_YZRexNYMvCQQfLyJPWM_vQn_x26rVS_xmF/pub?gid=1336017158&single=true&output=csv";
   const NATION_ROW_INDEX = 1;       // row 2 (0-indexed)
   const CLAIM_CODE_ROW_INDEX = 19;  // row 20 (0-indexed)
   const FIRST_DATA_COLUMN = 1;      // column B (0-indexed) - column A assumed to be a row label
