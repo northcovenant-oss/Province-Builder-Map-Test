@@ -31,8 +31,8 @@
 (function () {
   const CLAIMS_SHEET_CSV_URL =
     "https://docs.google.com/spreadsheets/d/1GSaqRFLXAyr13NIPWLi-COP2618QG4gg8ki4y-4rqVk/export?format=csv&gid=113158919";
-  const NATION_COLUMN = 1;      // column B
-  const CLAIM_CODE_COLUMN = 19; // column T
+  const NATION_COLUMN = 2;      // column B
+  const CLAIM_CODE_COLUMN = 20; // column T
 
   // Minimal CSV row parser (handles quoted fields, escaped quotes) - no
   // external library, same approach used for the Market Saturation sheet.
