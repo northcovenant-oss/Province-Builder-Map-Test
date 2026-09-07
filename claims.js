@@ -106,7 +106,18 @@
         return Promise.resolve([]);
       }
       const byLabel = {};
-      (window.PROVINCES || []).forEach(function (p) { byLabel[p.label] = p; });
+      // data.js declares `const PROVINCES = [...]`. Top-level const/let
+      // across separate <script> tags share the page's lexical scope, but
+      // do NOT become window properties (unlike var) - so window.PROVINCES
+      // is genuinely undefined even though the bare identifier works fine.
+      // This was the actual bug behind "Loaded 0 claim(s)" with otherwise
+      // valid data: window.PROVINCES silently evaluated to undefined,
+      // byLabel ended up empty, and every single province label lookup
+      // failed. Checking the bare identifier first fixes it; window.PROVINCES
+      // stays as a defensive fallback in case that declaration ever changes
+      // to var.
+      const allProvinces = (typeof PROVINCES !== "undefined") ? PROVINCES : (window.PROVINCES || []);
+      allProvinces.forEach(function (p) { byLabel[p.label] = p; });
 
       return fetch(CLAIMS_SHEET_CSV_URL, { cache: "no-store" })
         .then(function (res) {
