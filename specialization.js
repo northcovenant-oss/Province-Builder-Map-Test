@@ -737,7 +737,9 @@
   //
   // One line per filled rank, ordinal-labeled to match how the rank is
   // referred to everywhere else on this page (1st/2nd/etc.), listing
-  // whatever IMPORTS_BY_SPECIALIZATION has for that specialization.
+  // whatever IMPORTS_BY_SPECIALIZATION has for that specialization (some
+  // Services picks intentionally have none - see the comment on that
+  // table in specialization-data.js).
   function renderRequiredImports(){
     const el = document.getElementById('summaryImports');
     if(!el) return;
