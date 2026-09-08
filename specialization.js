@@ -542,10 +542,10 @@
   // link, IIWiki link) are left as the original template's own literal
   // placeholder text for the player to fill in by hand after copying.
   const CITIZEN_CARD_TEMPLATE =
-`[pre][*][box][background-block=#FFE6E6][center][size=250][b] [nation=noflag]{{NATION}}[/nation][/b][/size]
+`[pre][box][background-block=#FFE6E6][center][size=250][b] [nation=noflag]{{NATION}}[/nation][/b][/size]
 [img]200x100 Pixel Image of Flag here[/img]
 [u]Join Date:{{JOIN_DATE}}[/u]
-[Spoiler= More Information[DELETE ME]][table=plain][tr]
+[Spoiler= More Information][table=plain][tr]
 [td][size=110]Classification:
 [b]{{CLASSIFICATION}}[/b][/size][/td]
 [td][size=110]Capital:
@@ -572,7 +572,7 @@
 [*]Air Force: {{AIR_FORCE}}
 [*]Expeditionary: {{EXPEDITIONARY}}
 [*]Paramilitary: {{PARAMILITARY}}[/list][/td]
-[/tr][/table][/spoiler[DELETE ME]]
+[/tr][/table][/spoiler]
 
 [url=DISPATCH HERE]Full Citizen Application[/url]
 [url=IIWIKI LINK (Optional but encouraged)]IIWiki Page[/url]
@@ -586,7 +586,10 @@
     return mm + '-' + dd + '-' + yy;
   }
 
-  function buildCitizenCard(){
+  // Common values both the Citizen Card and the Full Application pull
+  // from - factored out so the two templates can't drift out of sync
+  // with each other on things like how Pacifist is worded.
+  function gatherCommonFields(){
     const specs = [0,1,2,3,4].map(function(i){ return chosenSpecs[i] || ''; });
     const priorityText = chosenStance === 'Pacifist' ? 'Pacifist (no military)' : (chosenPriority || '');
     const stanceText = chosenStance || '';
@@ -596,6 +599,12 @@
     const expeditionary = String(focusValues['Expeditionary Forces'] || 0);
     const paramilitary = String(focusValues['Paramilitary / Militia / Gendarmes / Reserves'] || 0);
     const nationName = document.getElementById('identityNation').value.trim();
+    return { specs, priorityText, stanceText, army, navy, airForce, expeditionary, paramilitary, nationName };
+  }
+
+  function buildCitizenCard(){
+    const f = gatherCommonFields();
+    const nationName = f.nationName;
 
     const card = CITIZEN_CARD_TEMPLATE
       .replace('{{NATION}}', nationName || 'Nation')
@@ -606,15 +615,15 @@
       .replace('{{GOVERNMENT_TYPE}}', document.getElementById('identityGovernment').value.trim())
       .replace('{{ECONOMY_TYPE}}', snapshot.economyType || '')
       .replace('{{GDP}}', snapshot.gdp || '')
-      .replace('{{SPEC1}}', specs[0]).replace('{{SPEC2}}', specs[1]).replace('{{SPEC3}}', specs[2])
-      .replace('{{SPEC4}}', specs[3]).replace('{{SPEC5}}', specs[4])
-      .replace('{{PRIORITY}}', priorityText)
-      .replace('{{STANCE}}', stanceText)
-      .replace('{{ARMY}}', army)
-      .replace('{{NAVY}}', navy)
-      .replace('{{AIR_FORCE}}', airForce)
-      .replace('{{EXPEDITIONARY}}', expeditionary)
-      .replace('{{PARAMILITARY}}', paramilitary);
+      .replace('{{SPEC1}}', f.specs[0]).replace('{{SPEC2}}', f.specs[1]).replace('{{SPEC3}}', f.specs[2])
+      .replace('{{SPEC4}}', f.specs[3]).replace('{{SPEC5}}', f.specs[4])
+      .replace('{{PRIORITY}}', f.priorityText)
+      .replace('{{STANCE}}', f.stanceText)
+      .replace('{{ARMY}}', f.army)
+      .replace('{{NAVY}}', f.navy)
+      .replace('{{AIR_FORCE}}', f.airForce)
+      .replace('{{EXPEDITIONARY}}', f.expeditionary)
+      .replace('{{PARAMILITARY}}', f.paramilitary);
 
     // A copy-paste-ready block matching the FR (Form Responses) sheet's
     // own column order (B through T - column A/Timestamp is filled by
@@ -628,22 +637,99 @@
       snapshot.foodProduction || '',
       snapshot.energyProduction || '',
       snapshot.population || '',
-      specs[0],
-      specs[1],
-      specs[2],
-      specs[3],
-      specs[4],
-      priorityText,
-      stanceText,
-      navy,
-      army,
-      airForce,
-      expeditionary,
-      paramilitary,
+      f.specs[0],
+      f.specs[1],
+      f.specs[2],
+      f.specs[3],
+      f.specs[4],
+      f.priorityText,
+      f.stanceText,
+      f.navy,
+      f.army,
+      f.airForce,
+      f.expeditionary,
+      f.paramilitary,
       snapshot.claimCode || '',
     ].join('\n');
 
     return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo + '\n[/spoiler]';
+  }
+
+  // ---- Full Application BBC generator ----
+  //
+  // A separate, longer template from the Citizen Card - this is the post
+  // players make in their own Dispatches (the Citizen Card above is what
+  // gets sent to Rylet directly, see the Next Steps note in Step 5's
+  // HTML). Every {{PLACEHOLDER}} below corresponds 1:1 to a
+  // "{Generator Fill}" spot in the community-provided template. Sections
+  // meant for the player to write themselves (Political Environment,
+  // Major Imports picks, economy narrative, military narrative, History)
+  // are left as the original template's own instructional text in
+  // parentheses - this page has no data to fill those from, same
+  // philosophy as the Citizen Card leaving the flag image for the player.
+  const FULL_APPLICATION_TEMPLATE =
+`[list][*][b]Display Name[/b]: {{DISPLAY_NAME}}
+[*][b]Capital City[/b]: {{CAPITAL}}
+[*][b]Territory[/b]: [spoiler][img]INSERTIMAGEHERE[/img][/spoiler]
+[*][b]Population[/b]: {{POPULATION}}
+[*][b]Description of Political Environment[/b]: 
+
+
+(Give a fairly detailed description of your nation's Government, including Type of Government, Head of Government/State, legislature, etc.)
+
+[*][b]Description of the Economy[/b]: 
+
+[list]
+[*][b]Economy Type[/b]: {{ECONOMY_TYPE}}
+
+[*][b]Specialization[/b]
+{{SPEC1}} | {{SPEC2}} | {{SPEC3}} | {{SPEC4}}| {{SPEC5}}|
+[*][b]Description of Resources:[/b]
+    Food Production: {{FOOD_PRODUCTION}}
+    Energy Production: {{ENERGY_PRODUCTION}}
+
+[*][b]Major Imports[/b]
+(Use the potential imports section as an idea of what kind of imports your nation might need. Some things make sense to produce nationally while others might be outside of the scope of your nation. Choose a few 3-5 to list so you can find economic partners)
+[/list]
+
+(Describe your economic system including the type of economy, the GDP in the Land Bio as well as the world exports chosen from the form. Outside of Land Bio information, be sure to tell us about how your economy operates going slightly beyond just saying "free trade")
+
+[*][b]Description of Your Nation's Military:[/b]
+
+[b]Military Doctrine[/b]: {{MIL_DOCTRINE}}
+
+[b]National Attitude[/b]: {{NATIONAL_ATTITUDE}}
+
+[b]Military Focus[/b]:
+[List]
+{{ARMY}} :[b]Army[/b]
+{{NAVY}} :[b]Navy[/b]
+{{AIR_FORCE}} :[b]Air force[/b]
+{{EXPEDITIONARY}} :[b]Expeditionary[/b]
+{{PARAMILITARY}} :[b] Paramilitary/Militia/Gendarmes[/b]
+[/list]
+(Military size, type, and quality of equipment, strengths/weaknesses, etc.[Size should be at most 5% of your country's population most nations should be well below that])
+
+[*][b]History of your Nation[/b]: (Make it sufficiently detailed to take into account all territorial claims)`;
+
+  function buildFullApplication(){
+    const f = gatherCommonFields();
+    return FULL_APPLICATION_TEMPLATE
+      .replace('{{DISPLAY_NAME}}', f.nationName || 'Nation')
+      .replace('{{CAPITAL}}', document.getElementById('identityCapital').value.trim())
+      .replace('{{POPULATION}}', snapshot.population || '')
+      .replace('{{ECONOMY_TYPE}}', snapshot.economyType || '')
+      .replace('{{SPEC1}}', f.specs[0]).replace('{{SPEC2}}', f.specs[1]).replace('{{SPEC3}}', f.specs[2])
+      .replace('{{SPEC4}}', f.specs[3]).replace('{{SPEC5}}', f.specs[4])
+      .replace('{{FOOD_PRODUCTION}}', snapshot.foodProduction || '')
+      .replace('{{ENERGY_PRODUCTION}}', snapshot.energyProduction || '')
+      .replace('{{MIL_DOCTRINE}}', f.priorityText)
+      .replace('{{NATIONAL_ATTITUDE}}', f.stanceText)
+      .replace('{{ARMY}}', f.army)
+      .replace('{{NAVY}}', f.navy)
+      .replace('{{AIR_FORCE}}', f.airForce)
+      .replace('{{EXPEDITIONARY}}', f.expeditionary)
+      .replace('{{PARAMILITARY}}', f.paramilitary);
   }
 
   // Same copy-to-clipboard pattern used on the bio page (map.js's
@@ -675,6 +761,11 @@
     document.getElementById('citizenCardSource').value = text;
     return text;
   }, 'Copy Citizen Card BBC Code');
+  bindCopyButton('copyFullApplicationBtn', function(){
+    const text = buildFullApplication();
+    document.getElementById('fullApplicationSource').value = text;
+    return text;
+  }, 'Full Application');
 
   // ---- Step navigation ----
   const TOTAL_STEPS = 5;
