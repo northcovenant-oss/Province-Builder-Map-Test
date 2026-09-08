@@ -684,7 +684,7 @@
   const stepIndicator = document.getElementById('stepIndicator');
 
   function panelFor(step){
-    return step === 'summary' ? document.getElementById('stepSummary') : document.getElementById('step' + step);
+    return document.getElementById('step' + step);
   }
 
   function updateNextButtonState(){
@@ -699,8 +699,7 @@
       const focusComplete = chosenStance === 'Pacifist' || pointsSpent() === budget;
       enabled = doctrineChosen && focusComplete;
     }
-    // Step 5 (National Identity) is never gated - these are flavor fields,
-    // not required to see the summary.
+    // Step 5 (National Identity) is never gated - these are flavor fields.
     nextBtn.disabled = !enabled;
     const standardSetupNextBtn = document.getElementById('standardSetupNextBtn');
     if(standardSetupNextBtn) standardSetupNextBtn.disabled = !enabled;
@@ -710,38 +709,36 @@
 
   function showStep(step){
     // hide all panels
-    [1,2,3,4,5,'summary'].forEach(function(s){ panelFor(s).hidden = true; });
+    [1,2,3,4,5].forEach(function(s){ panelFor(s).hidden = true; });
     panelFor(step).hidden = false;
 
     backBtn.hidden = (step === 1);
     nextBtn.textContent = (step === TOTAL_STEPS) ? 'Finish \u2192' : 'Next \u2192';
-    if(step === 'summary'){
-      nextBtn.hidden = true;
-    } else {
-      nextBtn.hidden = false;
-    }
+    // Step 5 is the real final step now (no separate summary page after
+    // it) - nothing to advance to, so the Next/Finish button just hides.
+    nextBtn.hidden = (step === TOTAL_STEPS);
 
     // update step-indicator dots
     stepIndicator.querySelectorAll('.step-dot').forEach(function(dot){
       const dotStep = parseInt(dot.getAttribute('data-step'), 10);
-      dot.classList.toggle('active', step !== 'summary' && dotStep === step);
-      dot.classList.toggle('done', step === 'summary' || dotStep < step);
+      dot.classList.toggle('active', dotStep === step);
+      dot.classList.toggle('done', dotStep < step);
     });
 
     if(step === 3){ renderChosenSummary(); renderEnergyAdjustment(); }
-    if(step === 'summary') renderFinalSummary();
+    if(step === 5) renderPotentialImports();
     updateNextButtonState();
   }
 
-  // ---- Summary: required imports for the 5 chosen specializations ----
+  // ---- Step 5: potential imports for the 5 chosen specializations ----
   //
   // One line per filled rank, ordinal-labeled to match how the rank is
   // referred to everywhere else on this page (1st/2nd/etc.), listing
   // whatever IMPORTS_BY_SPECIALIZATION has for that specialization (some
-  // Services picks intentionally have none - see the comment on that
-  // table in specialization-data.js).
-  function renderRequiredImports(){
-    const el = document.getElementById('summaryImports');
+  // picks intentionally have none - see the comment on that table in
+  // specialization-data.js).
+  function renderPotentialImports(){
+    const el = document.getElementById('potentialImportsList');
     if(!el) return;
     const lines = [];
     chosenSpecs.forEach(function(spec, i){
@@ -753,29 +750,6 @@
     el.innerHTML = lines.join('') || '\u2014';
   }
 
-  function renderFinalSummary(){
-    document.getElementById('summarySpecs').textContent = chosenSpecs.filter(Boolean).join(', ') || '\u2014';
-    renderRequiredImports();
-    const militarySummary = chosenStance === 'Pacifist'
-      ? 'Pacifist - no military'
-      : (chosenPriority || '\u2014') + ' priority, ' + (chosenStance || '\u2014') + ' stance \u2014 ' +
-        MILITARY_BRANCHES.map(function(b){ return b.id + ': ' + (focusValues[b.id] || 0); }).join(', ');
-    document.getElementById('summaryMilitary').textContent = militarySummary;
-    const popSelect = document.getElementById('specPopAdjust');
-    const pct = parseInt(popSelect.value, 10);
-    document.getElementById('summaryPopLevel').textContent = (pct >= 0 ? '+' : '') + pct + '%' + (pct === 0 ? ' (Stable)' : '');
-    const identityBits = [
-      document.getElementById('identityClassification').value.trim(),
-      document.getElementById('identityNation').value.trim(),
-    ].filter(Boolean).join(' ');
-    const capitalBit = document.getElementById('identityCapital').value.trim();
-    const govBit = document.getElementById('identityGovernment').value.trim();
-    let identitySummary = identityBits || '\u2014';
-    if(capitalBit) identitySummary += ' \u2014 Capital: ' + capitalBit;
-    if(govBit) identitySummary += ' \u2014 ' + govBit;
-    document.getElementById('summaryIdentity').textContent = identitySummary;
-  }
-
   backBtn.addEventListener('click', function(){
     if(currentStep > 1){ currentStep -= 1; showStep(currentStep); }
   });
@@ -783,9 +757,9 @@
     if(currentStep < TOTAL_STEPS){
       currentStep += 1;
       showStep(currentStep);
-    } else {
-      showStep('summary');
     }
+    // On step 5 the button is hidden (see showStep), so there's nothing
+    // further to advance to - no else branch needed.
   });
 
   showStep(currentStep);
