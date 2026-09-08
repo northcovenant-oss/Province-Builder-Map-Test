@@ -63,6 +63,7 @@ function generateLandBio(provinces) {
     energy: p.value,
     resource: resourceByLabel[p.label] || null,
     climate: climateByLabel[p.label] || null,
+    econ: p.econ || null,
   }));
 
   return {

@@ -71,21 +71,24 @@
   // Fuel specializations require having a matching resource province, and
   // climate-gated specializations (Forestry's wood types) require having
   // a matching climate province - a player can't specialize in extracting
-  // or harvesting something their claim doesn't actually have any of.
-  // Computed once from the snapshot's per-province data. If that data
-  // isn't available at all (an older bio snapshot predating the resource/
-  // climate hand-off), every gated specialization is treated as
-  // unavailable rather than assumed to qualify, since there's no way to
-  // actually verify it.
+  // or harvesting something their claim doesn't actually have any of, and
+  // Primary-sector specializations (Agriculture/Fishing/Forestry/Mining)
+  // require a province of the matching economic type. Computed once from
+  // the snapshot's per-province data. If that data isn't available at all
+  // (an older bio snapshot predating this hand-off), every gated
+  // specialization is treated as unavailable rather than assumed to
+  // qualify, since there's no way to actually verify it.
   const availableResources = {};
   const availableClimates = {};
+  const availableEconSectors = {};
   (snapshot.perProvinceEnergy || []).forEach(function(p){
     if(p.resource) availableResources[p.resource] = true;
     if(p.climate) availableClimates[p.climate] = true;
+    if(p.econ) availableEconSectors[p.econ] = true;
   });
 
   function specializationGateReason(name){
-    const status = specializationRequirementStatus(name, availableResources, availableClimates);
+    const status = specializationRequirementStatus(name, availableResources, availableClimates, availableEconSectors);
     if(status === null || status === true) return null; // no requirement, or requirement met
     return status; // e.g. "requires Oil in your claim"
   }

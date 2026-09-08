@@ -301,27 +301,72 @@ const CLIMATE_SPEC_REQUIREMENTS = {
   "Fishing - Pearling":           ["Tropical Rainforest", "Tropical Wet Dry"],
 };
 
+// ---- Primary sector specializations gated by a province's economic type ----
+//
+// Matched by name prefix (e.g. any "Agriculture - X" item) rather than
+// listing every individual specialization out. Forestry and Fishing have
+// no dedicated econ type of their own in this project (adding one would
+// mean reworking the food/energy/population/GDP formulas AND reclassifying
+// every existing province in data.js - a much bigger change than this),
+// so both are grouped under Agriculture Focused/Oriented, matching how
+// agriculture/forestry/fishing are commonly grouped as primary biological
+// production in real-world classification. Mining requires Mineral
+// Focused/Oriented. Fuel isn't listed here - it's already gated
+// indirectly, since only Energy Focused/Oriented provinces roll a
+// resource at all (see rollProvinceResources in landbio.js).
+const PRIMARY_ECON_SECTOR_REQUIREMENTS = {
+  "Agriculture": ["Agriculture Focused", "Agriculture Oriented"],
+  "Fishing":     ["Agriculture Focused", "Agriculture Oriented"],
+  "Forestry":    ["Agriculture Focused", "Agriculture Oriented"],
+  "Mining":      ["Mineral Focused", "Mineral Oriented"],
+};
+
 // General-purpose "does this specialization's requirement check out"
-// function, covering both kinds of requirement this page enforces: a
-// Fuel specialization needing a matching rolled resource somewhere in the
-// claim, and a climate-gated specialization (Forestry's wood types)
-// needing a matching climate somewhere in the claim. Returns null if the
-// specialization has no requirement at all (nothing to check), or a short
-// requirement description string if it does but isn't met, or true if it
-// has a requirement and DOES meet it (so callers can tell "no requirement"
-// apart from "requirement met").
-function specializationRequirementStatus(name, availableResources, availableClimates){
+// function, covering every kind of requirement this page enforces: a Fuel
+// specialization needing a matching rolled resource somewhere in the
+// claim, a climate-gated specialization (Forestry's wood types, Pearling)
+// needing a matching climate somewhere in the claim, and a Primary-sector
+// specialization needing a province of the matching economic type
+// somewhere in the claim. Requirements can compound (Forestry's wood
+// types need BOTH a matching climate AND an Agriculture-type province) -
+// all applicable ones are checked, and any that fail are combined into
+// one message. Returns null if the specialization has no requirement at
+// all, true if it has one (or more) and all are met, or a description of
+// what's missing otherwise.
+function specializationRequirementStatus(name, availableResources, availableClimates, availableEconSectors){
+  let hasAnyRequirement = false;
+  const unmetReasons = [];
+
   const resource = FUEL_SPEC_TO_RESOURCE[name];
   if(resource){
-    return availableResources[resource] ? true : ('requires ' + resource + ' in your claim');
+    hasAnyRequirement = true;
+    if(!availableResources[resource]) unmetReasons.push('requires ' + resource + ' in your claim');
   }
+
   const climates = CLIMATE_SPEC_REQUIREMENTS[name];
   if(climates){
-    const met = climates.some(function(c){ return availableClimates[c]; });
-    if(met) return true;
-    return 'requires ' + (climates.length === 1 ? climates[0] : climates.join(' or ')) + ' climate in your claim';
+    hasAnyRequirement = true;
+    const climateMet = climates.some(function(c){ return availableClimates[c]; });
+    if(!climateMet){
+      unmetReasons.push('requires ' + (climates.length === 1 ? climates[0] : climates.join(' or ')) + ' climate in your claim');
+    }
   }
-  return null; // no requirement at all
+
+  const sectorPrefix = Object.keys(PRIMARY_ECON_SECTOR_REQUIREMENTS).filter(function(p){
+    return name.indexOf(p + ' - ') === 0;
+  })[0];
+  if(sectorPrefix){
+    hasAnyRequirement = true;
+    const econTypes = PRIMARY_ECON_SECTOR_REQUIREMENTS[sectorPrefix];
+    const econMet = econTypes.some(function(e){ return (availableEconSectors || {})[e]; });
+    if(!econMet){
+      unmetReasons.push('requires ' + econTypes.join(' or ') + ' in your claim');
+    }
+  }
+
+  if(!hasAnyRequirement) return null;
+  if(unmetReasons.length === 0) return true;
+  return unmetReasons.join('; ');
 }
 
 const ENERGY_SPEC_NAMES = ["Energy - Nuclear", "Energy - Renewable", "Energy - Fossil Fuels"];
