@@ -714,7 +714,7 @@
 
   function buildFullApplication(){
     const f = gatherCommonFields();
-    return FULL_APPLICATION_TEMPLATE
+    const application = FULL_APPLICATION_TEMPLATE
       .replace('{{DISPLAY_NAME}}', f.nationName || 'Nation')
       .replace('{{CAPITAL}}', document.getElementById('identityCapital').value.trim())
       .replace('{{POPULATION}}', snapshot.population || '')
@@ -730,6 +730,15 @@
       .replace('{{AIR_FORCE}}', f.airForce)
       .replace('{{EXPEDITIONARY}}', f.expeditionary)
       .replace('{{PARAMILITARY}}', f.paramilitary);
+
+    // The Citizen Card used to be its own separate copy button - it's now
+    // folded into the bottom of the Full Application (wrapped in its own
+    // spoiler) since players send the whole Application to Rylet as one
+    // piece. buildCitizenCard() is unchanged and still includes its own
+    // nested admin-info spoiler - that data is exactly what Rylet needs
+    // to process the application, so it travels along with it.
+    const citizenCard = buildCitizenCard();
+    return application + '\n\n[spoiler=Citizen Card]\n' + citizenCard + '\n[/spoiler]';
   }
 
   // Same copy-to-clipboard pattern used on the bio page (map.js's
@@ -756,11 +765,6 @@
       }
     });
   }
-  bindCopyButton('copyCitizenCardBtn', function(){
-    const text = buildCitizenCard();
-    document.getElementById('citizenCardSource').value = text;
-    return text;
-  }, 'Copy Citizen Card BBC Code');
   bindCopyButton('copyFullApplicationBtn', function(){
     const text = buildFullApplication();
     document.getElementById('fullApplicationSource').value = text;
