@@ -56,6 +56,55 @@
   const specSlotsEl = document.getElementById('specSlots');
   const chosenSpecs = new Array(5).fill(null); // one choice per rank, in order
 
+  // ---- Small claims: fewer World Export slots ----
+  //
+  // A claim under 10 provinces represents a smaller nation whose workforce
+  // can't realistically support 5 distinct major export industries, so it
+  // only gets 3 World Export slots instead of 5. Two of those are sourced
+  // from the bio's 1st and 2nd ranked exports specifically (not 1st/3rd,
+  // etc.) - a combined economy type (e.g. "Industrial Goods & Services")
+  // generates its two component sectors as the 1st and 2nd ranked exports,
+  // so sourcing from ranks 1 and 2 guarantees both halves of a combined
+  // economy type actually show up as real specializations, rather than
+  // risking the 2nd sector getting crowded out by whatever lands in a
+  // later, less predictable rank. The 3rd slot is sourced from the 5th
+  // ranked export. Players see all three labeled sequentially as "1st
+  // Export", "2nd Export", "3rd Export".
+  //
+  // Each visible slot has a SOURCE rank (which world-export label/pool it
+  // draws its options from) and a STORAGE index (where the pick lands in
+  // chosenSpecs). For a small claim these differ for the 2nd slot: it
+  // sources its options from world-export rank 2 (index 1), but the pick
+  // is stored at chosenSpecs[2] - the SPEC3 position - not chosenSpecs[1].
+  // This is deliberate and affects real game mechanics, not just display:
+  // every rank-keyed table in specialization-data.js (FUEL_MULTIPLIER_BY_
+  // RANK, ENERGY_FLAT_BONUS_BY_RANK) reads chosenSpecs by its ARRAY INDEX,
+  // so a spec landing at chosenSpecs[2] genuinely gets 3rd-rank bonus
+  // strength (2x / +75), not 2nd-rank strength - matching the fact that
+  // it's recorded as the SPEC3 pick. This one storage decision is what
+  // drives the Citizen Card / admin info / Full Application recording too
+  // (SPEC2 and SPEC4 simply stay null/blank, no separate remapping step
+  // needed) as well as Step 3's bonus math - both fall out of the same
+  // array position automatically.
+  const SMALL_CLAIM_PROVINCE_THRESHOLD = 10;
+  const provinceCount = (snapshot.perProvinceEnergy || []).length;
+  // Only restrict when province count is actually known (>0) - an older
+  // snapshot with no per-province data at all can't be judged as "small",
+  // so it falls back to the normal 5 slots rather than being guessed at.
+  const isSmallClaim = provinceCount > 0 && provinceCount < SMALL_CLAIM_PROVINCE_THRESHOLD;
+  // { sourceRank: which worldExports[] label/pool supplies the options,
+  //   storageIndex: which chosenSpecs[] slot the pick is written to }
+  const VISIBLE_SLOTS = isSmallClaim
+    ? [{ sourceRank: 0, storageIndex: 0 }, { sourceRank: 1, storageIndex: 2 }, { sourceRank: 4, storageIndex: 4 }]
+    : [0, 1, 2, 3, 4].map(function(i){ return { sourceRank: i, storageIndex: i }; });
+  // displayRankByStorageRank: maps a storage position's 1-indexed "rank"
+  // (as the bonus tables see it, i.e. storageIndex+1) back to its
+  // sequential display position, so the Step 3 breakdown's ordinal labels
+  // stay consistent with what Step 1 showed the player (still "2nd", not
+  // "3rd", even though the bonus strength genuinely is 3rd-rank).
+  const displayRankByStorageRank = {};
+  VISIBLE_SLOTS.forEach(function(slot, displayIndex){ displayRankByStorageRank[slot.storageIndex + 1] = displayIndex + 1; });
+
   if(!hasWorldExports){
     const warning = document.createElement('div');
     warning.className = 'spec-warning';
@@ -64,6 +113,15 @@
       'every specialization rather than the ranking your bio actually generated - go back and re-generate your ' +
       'bio, then continue here again, if you want the real ranking.';
     specSlotsEl.parentNode.insertBefore(warning, specSlotsEl);
+  }
+
+  if(isSmallClaim){
+    const smallClaimNote = document.createElement('div');
+    smallClaimNote.className = 'spec-warning';
+    smallClaimNote.textContent = 'Your claim has ' + provinceCount + ' province' + (provinceCount === 1 ? '' : 's') +
+      ' (fewer than ' + SMALL_CLAIM_PROVINCE_THRESHOLD + '), so to reflect your smaller workforce you only get 3 ' +
+      'World Export slots instead of 5, drawn from your bio\u2019s 1st, 2nd, and 5th ranked exports.';
+    specSlotsEl.parentNode.insertBefore(smallClaimNote, specSlotsEl);
   }
 
   function specId(rank, name){ return 'spec_' + rank + '_' + name.replace(/[^a-z0-9]+/gi, '_'); }
@@ -93,17 +151,17 @@
     return status; // e.g. "requires Oil in your claim"
   }
 
-  function buildSlot(rank){
-    const label = worldExports[rank];
+  function buildSlot(sourceRank, storageIndex, displayIndex){
+    const label = worldExports[sourceRank];
     const poolNames = poolsForExportLabel(label);
 
     const slotDiv = document.createElement('div');
     slotDiv.className = 'spec-slot';
-    slotDiv.setAttribute('data-rank', rank);
+    slotDiv.setAttribute('data-rank', storageIndex);
 
     const heading = document.createElement('div');
     heading.className = 'spec-slot-heading';
-    heading.appendChild(document.createTextNode(RANK_LABELS[rank] + ' Export: '));
+    heading.appendChild(document.createTextNode(RANK_LABELS[displayIndex] + ' Export: '));
     const sectorSpan = document.createElement('span');
     sectorSpan.className = 'rank-sector';
     sectorSpan.textContent = label;
@@ -124,13 +182,13 @@
       optionsDiv.appendChild(groupLabel);
 
       (SPECIALIZATION_POOLS[poolName] || []).forEach(function(name){
-        const id = specId(rank, name);
+        const id = specId(storageIndex, name);
         const optLabel = document.createElement('label');
         optLabel.className = 'spec-option';
         optLabel.setAttribute('for', id);
         const input = document.createElement('input');
         input.type = 'radio';
-        input.name = 'specRank' + rank;
+        input.name = 'specRank' + storageIndex;
         input.id = id;
         input.value = name;
 
@@ -155,7 +213,7 @@
     return slotDiv;
   }
 
-  for(let rank = 0; rank < 5; rank++){ specSlotsEl.appendChild(buildSlot(rank)); }
+  VISIBLE_SLOTS.forEach(function(slot, displayIndex){ specSlotsEl.appendChild(buildSlot(slot.sourceRank, slot.storageIndex, displayIndex)); });
 
   // ---- Market Saturation (live from the community's Google Sheet) ----
   // Shows a colored badge next to each specialization reflecting how many
@@ -242,8 +300,8 @@
       status.classList.remove('filled');
     });
 
-    for(let rank = 0; rank < 5; rank++){
-      const poolNames = poolsForExportLabel(worldExports[rank]);
+    VISIBLE_SLOTS.forEach(function(slot){
+      const poolNames = poolsForExportLabel(worldExports[slot.sourceRank]);
       let candidates = [];
       poolNames.forEach(function(poolName){
         (SPECIALIZATION_POOLS[poolName] || []).forEach(function(name){ candidates.push(name); });
@@ -257,14 +315,14 @@
         });
         if(lessCrowded.length > 0) candidates = lessCrowded;
       }
-      if(candidates.length === 0) continue;
+      if(candidates.length === 0) return;
       const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      const radio = document.getElementById(specId(rank, pick));
+      const radio = document.getElementById(specId(slot.storageIndex, pick));
       if(radio){
         radio.checked = true;
         radio.dispatchEvent(new Event('change', { bubbles: true }));
       }
-    }
+    });
     updateNextButtonState();
   });
 
@@ -519,14 +577,14 @@
     result.appliedFuelBonuses.forEach(function(b){
       const line = document.createElement('span');
       line.className = 'breakdown-item';
-      line.textContent = b.spec + ' (' + ordinal(b.rank) + ') \u2014 ' + b.multiplier + '\u00d7 on ' +
+      line.textContent = b.spec + ' (' + ordinal(displayRankByStorageRank[b.rank] || b.rank) + ') \u2014 ' + b.multiplier + '\u00d7 on ' +
         b.resource + ' provinces: ' + (b.provinces.length ? b.provinces.join(', ') : 'none in this claim');
       breakdownEl.appendChild(line);
     });
     result.appliedEnergyBonuses.forEach(function(b){
       const line = document.createElement('span');
       line.className = 'breakdown-item';
-      line.textContent = b.spec + ' (' + ordinal(b.rank) + ') \u2014 +' + b.bonus + ' flat';
+      line.textContent = b.spec + ' (' + ordinal(displayRankByStorageRank[b.rank] || b.rank) + ') \u2014 +' + b.bonus + ' flat';
       breakdownEl.appendChild(line);
     });
     if(result.appliedFuelBonuses.length === 0 && result.appliedEnergyBonuses.length === 0){
@@ -590,6 +648,8 @@
   // from - factored out so the two templates can't drift out of sync
   // with each other on things like how Pacifist is worded.
   function gatherCommonFields(){
+    // chosenSpecs is already indexed by its recorded SPEC position (see
+    // VISIBLE_SLOTS above) - no remapping needed here anymore.
     const specs = [0,1,2,3,4].map(function(i){ return chosenSpecs[i] || ''; });
     const priorityText = chosenStance === 'Pacifist' ? 'Pacifist (no military)' : (chosenPriority || '');
     const stanceText = chosenStance || '';
@@ -784,7 +844,7 @@
 
   function updateNextButtonState(){
     let enabled = true;
-    if(currentStep === 1) enabled = chosenSpecs.every(Boolean);
+    if(currentStep === 1) enabled = VISIBLE_SLOTS.every(function(slot){ return !!chosenSpecs[slot.storageIndex]; });
     if(currentStep === 2){
       // Doctrine (both Priority and Stance) always required. Focus points
       // must be fully allocated too, UNLESS Pacifist (budget is 0, so
@@ -836,11 +896,12 @@
     const el = document.getElementById('potentialImportsList');
     if(!el) return;
     const lines = [];
-    chosenSpecs.forEach(function(spec, i){
+    VISIBLE_SLOTS.forEach(function(slot, displayIndex){
+      const spec = chosenSpecs[slot.storageIndex];
       if(!spec) return;
       const imports = importsForSpecialization(spec);
       const importsText = imports.length ? imports.join(', ') : 'No specific imports required';
-      lines.push('<div class="import-line"><strong>' + ordinal(i + 1) + ' \u2014 ' + spec + ':</strong> ' + importsText + '</div>');
+      lines.push('<div class="import-line"><strong>' + ordinal(displayIndex + 1) + ' \u2014 ' + spec + ':</strong> ' + importsText + '</div>');
     });
     el.innerHTML = lines.join('') || '\u2014';
   }
