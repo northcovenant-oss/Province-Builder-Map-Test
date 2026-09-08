@@ -38,10 +38,8 @@ const SPECIALIZATION_POOLS = {
     "Fuel - Uranium Extraction",
   ],
   Services: [
-    "Hospitality - Cultural Activities",
     "Hospitality - Food Service",
     "Hospitality - Hotels",
-    "Hospitality - Sex Work",
     "Hospitality - Tourism",
     "Mass Media - Printing & Publishing",
     "Mass Media - Film Industry",
@@ -50,17 +48,12 @@ const SPECIALIZATION_POOLS = {
     "Mass Media - Digital Media",
     "Healthcare",
     "Information technology",
-    "Consulting",
     "Gambling",
     "Retailer - Online Store",
     "Retailer - Superstore",
     "Retail sales - Luxury Brand",
     "Financial services - Banking",
     "Financial services - Insurance",
-    "Financial services - Investment management",
-    "Professional services - Accounting",
-    "Professional services - Legal services",
-    "Professional services - Management consulting",
     "Cargo Transportation - Air",
     "Cargo Transportation - Ship",
     "Cargo Transportation - Rail",
@@ -143,6 +136,152 @@ const SPECIALIZATION_POOLS = {
     "Waste - Recycling",
   ],
 };
+
+// ---- Required Imports (by chosen specialization) ----
+//
+// For each specialization a player can pick in Step 1, the concrete goods
+// a nation built around that industry would realistically need to import
+// to operate it - no claim produces every input its own economy needs.
+// Complexity scales with the industry: raw extraction (Primary) needs the
+// fewest, mostly capital equipment (1-2); Services varies with how
+// goods-dependent the sector is (1-3); Light Industry's consumer
+// manufacturing needs a modest input chain (2-3); Heavy Industry's complex
+// manufacturing needs the most (3-5). Purely descriptive flavor text for
+// the Summary panel - not wired into any other mechanic (energy/food/GDP)
+// in this file. Every entry in SPECIALIZATION_POOLS should have a matching
+// key here; if pools are edited, re-sync this table the same pass.
+const IMPORTS_BY_SPECIALIZATION = {
+  // -- Primary --
+  "Agriculture - Animals": ["Veterinary Pharmaceuticals", "Heavy Farm Machinery"],
+  "Agriculture - Animal Products": ["Refrigeration Equipment", "Packaging Materials"],
+  "Agriculture - Animal & Vegetable Bi-Products": ["Industrial Processing Equipment"],
+  "Agriculture - Carbohydrate Products": ["Fertilizers", "Harvesting Machinery"],
+  "Agriculture - Fruits": ["Fertilizers", "Refrigerated Transport"],
+  "Agriculture - Sugar": ["Refining Equipment", "Fertilizers"],
+  "Agriculture - Vegetables": ["Fertilizers", "Irrigation Equipment"],
+  "Fishing - Aquaculture": ["Fish Feed", "Aquaculture Equipment"],
+  "Fishing - Commercial": ["Fishing Vessels", "Refrigeration Equipment"],
+  "Fishing - Pearling": ["Diving Equipment"],
+  "Forestry - Hard Wood": ["Logging Machinery"],
+  "Forestry - Soft Wood": ["Logging Machinery"],
+  "Forestry - Rubber": ["Processing Chemicals"],
+  "Forestry - Tropical Hardwood": ["Logging Machinery", "Processing Equipment"],
+  "Mining - Precious Metals": ["Mining Machinery", "Refining Chemicals"],
+  "Mining - Base Metals": ["Mining Machinery"],
+  "Mining - Precious Stones": ["Cutting & Polishing Equipment"],
+  "Mining - Rare Earth Elements": ["Mining Machinery", "Refining Chemicals", "Specialized Extraction Equipment"],
+  "Mining - Industrial Minerals": ["Mining Machinery"],
+  "Fuel - Coal Mining": ["Mining Machinery", "Safety Equipment"],
+  "Fuel - Natural Gas Extraction": ["Drilling Equipment", "Pipeline Infrastructure"],
+  "Fuel - Petroleum Extraction": ["Drilling Equipment", "Pipeline Infrastructure", "Refining Technology"],
+  "Fuel - Uranium Extraction": ["Specialized Mining Equipment", "Radiation Safety Equipment"],
+
+  // -- Services --
+  "Hospitality - Food Service": ["Imported Foodstuffs", "Kitchen Equipment"],
+  "Hospitality - Hotels": ["Furniture", "Textiles (Linens)", "Building Materials"],
+  "Hospitality - Tourism": ["Transportation Vehicles", "Consumer Goods (for visitor spending)"],
+  "Mass Media - Printing & Publishing": ["Paper Pulp", "Printing Equipment", "Ink & Chemicals"],
+  "Mass Media - Film Industry": ["Film & Broadcast Equipment", "Electronics"],
+  "Mass Media - Broadcast (News & TV)": ["Broadcast Equipment", "Electronics", "Satellite/Telecom Infrastructure"],
+  "Mass Media - Music Industry": ["Audio Equipment", "Electronics"],
+  "Mass Media - Digital Media": ["Computing Hardware", "Semiconductors"],
+  "Healthcare": ["Pharmaceuticals", "Medical Equipment", "Laboratory Supplies"],
+  "Information technology": ["Semiconductors", "Computing Hardware", "Telecom Infrastructure"],
+  "Gambling": ["Gaming Equipment", "Electronics", "Security Systems"],
+  "Retailer - Online Store": ["Consumer Goods (for resale)", "Logistics/Warehouse Equipment"],
+  "Retailer - Superstore": ["Consumer Goods (for resale)", "Foodstuffs (for resale)"],
+  "Retail sales - Luxury Brand": ["Luxury Goods (for resale)", "Precious Metals & Stones"],
+  "Financial services - Banking": ["Computing Hardware", "Security Systems"],
+  "Financial services - Insurance": ["Computing Hardware", "Actuarial Software Systems"],
+  "Cargo Transportation - Air": ["Aircraft", "Aviation Fuel"],
+  "Cargo Transportation - Ship": ["Cargo Vessels", "Marine Fuel"],
+  "Cargo Transportation - Rail": ["Locomotives & Rolling Stock", "Electrical/Fuel Infrastructure"],
+  "Cargo Transportation - Road": ["Trucks & Vehicles", "Fuel"],
+  "Commercial Transportation - Air": ["Aircraft", "Aviation Fuel"],
+  "Commercial Transportation - Ship": ["Passenger Vessels", "Marine Fuel"],
+  "Commercial Transportation - Rail": ["Locomotives & Rolling Stock", "Electrical/Fuel Infrastructure"],
+
+  // -- Light Industry --
+  "Consumer Goods - Appliances": ["Steel", "Electronic Components", "Plastics"],
+  "Consumer Goods - Beauty Products": ["Chemical Compounds", "Packaging Materials"],
+  "Consumer Goods - Electronics": ["Semiconductors", "Rare Earth Elements", "Electronic Components"],
+  "Consumer Goods - Furniture": ["Lumber", "Textiles", "Hardware Fittings"],
+  "Consumer Goods - Luxury Goods": ["Precious Metals", "Precious Stones", "Fine Textiles"],
+  "Consumer Goods - Plastics": ["Petrochemical Feedstock", "Molding Machinery"],
+  "Foodstuffs - Alcohol": ["Agricultural Feedstock (Grain/Fruit)", "Glass Bottles & Packaging"],
+  "Foodstuffs - Baked Goods": ["Grain & Flour", "Packaging Materials"],
+  "Foodstuffs - Beverages": ["Sugar", "Packaging Materials", "Water Treatment Chemicals"],
+  "Foodstuffs - Candy": ["Sugar", "Cocoa/Flavoring Imports", "Packaging Materials"],
+  "Foodstuffs - Canned Goods": ["Metal Cans/Tin", "Preservatives", "Raw Produce"],
+  "Foodstuffs - Frozen Food": ["Refrigeration Equipment", "Raw Produce", "Packaging Materials"],
+  "Foodstuffs - Packaged Food": ["Raw Ingredients", "Packaging Materials"],
+  "Foodstuffs - Snacks": ["Raw Ingredients (Grain/Oil)", "Packaging Materials"],
+  "Animal Feed": ["Grain Surplus", "Nutritional Additives"],
+  "Leather industry": ["Raw Hides", "Tanning Chemicals"],
+  "Attire - Accessories": ["Metals", "Textiles", "Precious Stones (for premium lines)"],
+  "Attire - Clothing": ["Raw Textiles", "Dyes & Chemicals"],
+  "Ceramics & Glassware": ["Industrial Minerals", "Kiln/Furnace Equipment"],
+  "Attire - Footwear": ["Leather", "Rubber", "Synthetic Materials"],
+  "Textiles - Cotton": ["Raw Cotton Fiber", "Dyes & Chemicals"],
+  "Textiles - Natural Fibers": ["Raw Fiber Stock (Wool/Silk/Hemp)", "Dyes & Chemicals"],
+  "Textiles - Synthetic": ["Petrochemical Feedstock", "Dyes & Chemicals"],
+
+  // -- Heavy Industry --
+  "Automotive - Personal Vehicles": ["Steel", "Electronic Components", "Rubber", "Semiconductors"],
+  "Automotive - Transportation Vehicles": ["Steel", "Heavy Machinery Parts", "Electronic Components", "Rubber"],
+  "Automotive - Utility Vehicle": ["Steel", "Engine Components", "Rubber"],
+  "Aerospace - Civil Aircraft Small": ["Aluminum & Alloys", "Avionics Systems", "Composite Materials", "Precision Engineering Parts"],
+  "Aerospace - Civil Aircraft Large": ["Aluminum & Alloys", "Avionics Systems", "Composite Materials", "Jet Engine Components", "Precision Engineering Parts"],
+  "Aerospace - Helicopter": ["Aluminum & Alloys", "Avionics Systems", "Precision Engineering Parts", "Composite Materials"],
+  "Aerospace - Rockets": ["Specialized Alloys", "Propulsion Components", "Avionics Systems", "Composite Materials", "Precision Engineering Parts"],
+  "Aerospace - Spacecraft": ["Specialized Alloys", "Propulsion Components", "Avionics Systems", "Composite Materials", "Precision Engineering Parts"],
+  "Chemical - Commercial": ["Petrochemical Feedstock", "Industrial Minerals", "Processing Equipment"],
+  "Chemical - Commodity": ["Petrochemical Feedstock", "Industrial Minerals"],
+  "Chemical - Pharmaceuticals": ["Active Pharmaceutical Ingredients", "Laboratory Equipment", "Packaging Materials"],
+  "Construction - Commercial": ["Steel", "Cement & Industrial Minerals", "Heavy Machinery"],
+  "Construction - Industrial": ["Steel", "Cement & Industrial Minerals", "Heavy Machinery"],
+  "Defense - Ammunition": ["Base Metals", "Propellant Chemicals", "Precision Manufacturing Equipment"],
+  "Defense - Armoured Fighting Vehicle": ["Steel & Alloys", "Engine Components", "Electronics & Targeting Systems", "Composite Armor Materials"],
+  "Defense - Artillery": ["Steel & Alloys", "Precision Manufacturing Equipment", "Propellant Chemicals"],
+  "Defense - Explosives": ["Chemical Compounds", "Precision Manufacturing Equipment"],
+  "Defense - Firearms": ["Steel & Alloys", "Precision Manufacturing Equipment"],
+  "Defense - Missiles": ["Specialized Alloys", "Propulsion Components", "Guidance Electronics", "Propellant Chemicals"],
+  "Defense - Military Aircraft": ["Aluminum & Alloys", "Avionics Systems", "Jet Engine Components", "Composite Materials", "Precision Engineering Parts"],
+  "Defense - Military Vehicles": ["Steel & Alloys", "Engine Components", "Electronics Systems"],
+  "Defense - Ships": ["Steel", "Marine Engine Components", "Electronics & Radar Systems"],
+  "Defense - Submarines": ["Specialized Alloys", "Propulsion Components", "Sonar & Electronics Systems", "Precision Engineering Parts"],
+  "Electronics - Computing": ["Semiconductors", "Rare Earth Elements", "Precision Manufacturing Equipment"],
+  "Electronics - Industrial": ["Semiconductors", "Base Metals", "Precision Components"],
+  "Electronics - Semiconductor": ["Silicon Wafers", "Rare Earth Elements", "Precision Fabrication Equipment"],
+  "Electronics - Telecommunication": ["Semiconductors", "Rare Earth Elements", "Fiber Optic Materials"],
+  "Energy - Nuclear": ["Enriched Uranium", "Specialized Reactor Components", "Safety Systems"],
+  "Energy - Renewable": ["Rare Earth Elements", "Turbine/Photovoltaic Components", "Specialized Manufacturing Equipment"],
+  "Energy - Fossil Fuels": ["Refining Equipment", "Pipeline Infrastructure"],
+  "Engineering - Civil": ["Steel", "Cement & Industrial Minerals", "Heavy Machinery"],
+  "Engineering - Environmental": ["Specialized Filtration Equipment", "Chemical Compounds"],
+  "Engineering - Robotics": ["Semiconductors", "Precision Components", "Specialized Alloys"],
+  "General Machinery": ["Steel", "Precision Components", "Electronic Components"],
+  "Locomotive - Rapid Transit & Light Rail": ["Steel", "Electronics Systems", "Electrical Components"],
+  "Locomotive - Freight": ["Steel", "Engine Components"],
+  "Locomotive - Passenger/High Speed": ["Steel & Alloys", "Electronics Systems", "Precision Engineering Parts"],
+  "Metals - Alloys": ["Base Metals", "Rare Earth Elements", "Industrial Chemicals"],
+  "Metals - Refined Metals": ["Raw Ore & Base Metals", "Industrial Chemicals"],
+  "Metals - Steel": ["Iron Ore", "Coking Coal", "Industrial Chemicals"],
+  "Pulp and Paper Industry": ["Timber Pulp", "Industrial Chemicals"],
+  "Shipbuilding - Commercial Large": ["Steel", "Marine Engine Components", "Electronics Systems"],
+  "Shipbuilding - Commercial Small": ["Steel", "Marine Engine Components"],
+  "Shipbuilding - Private": ["Steel", "Marine Engine Components", "Fine Fittings & Materials"],
+  "Waste - Disposal": ["Specialized Processing Equipment"],
+  "Waste - Recycling": ["Specialized Sorting & Processing Equipment", "Industrial Chemicals"],
+};
+
+// Returns the import list for a specialization name, or an empty array if
+// it isn't in the table - shouldn't normally happen since every pool
+// entry has a matching key, but keeps callers safe against future pool
+// edits that outpace this list rather than throwing.
+function importsForSpecialization(name){
+  return IMPORTS_BY_SPECIALIZATION[name] || [];
+}
 
 // ---- Military Doctrine ----
 //

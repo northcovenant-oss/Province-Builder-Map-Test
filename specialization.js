@@ -733,8 +733,27 @@
     updateNextButtonState();
   }
 
+  // ---- Summary: required imports for the 5 chosen specializations ----
+  //
+  // One line per filled rank, ordinal-labeled to match how the rank is
+  // referred to everywhere else on this page (1st/2nd/etc.), listing
+  // whatever IMPORTS_BY_SPECIALIZATION has for that specialization.
+  function renderRequiredImports(){
+    const el = document.getElementById('summaryImports');
+    if(!el) return;
+    const lines = [];
+    chosenSpecs.forEach(function(spec, i){
+      if(!spec) return;
+      const imports = importsForSpecialization(spec);
+      const importsText = imports.length ? imports.join(', ') : 'No specific imports required';
+      lines.push('<div class="import-line"><strong>' + ordinal(i + 1) + ' \u2014 ' + spec + ':</strong> ' + importsText + '</div>');
+    });
+    el.innerHTML = lines.join('') || '\u2014';
+  }
+
   function renderFinalSummary(){
     document.getElementById('summarySpecs').textContent = chosenSpecs.filter(Boolean).join(', ') || '\u2014';
+    renderRequiredImports();
     const militarySummary = chosenStance === 'Pacifist'
       ? 'Pacifist - no military'
       : (chosenPriority || '\u2014') + ' priority, ' + (chosenStance || '\u2014') + ' stance \u2014 ' +
