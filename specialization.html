@@ -96,8 +96,7 @@
     <!-- ===== Step 3: Adjust Energy/Agricultural Production ===== -->
     <div class="spec-card step-panel" id="step3" data-step-panel="3" hidden>
       <h2>Step 3 &middot; Adjust Energy &amp; Agricultural Production</h2>
-      <p class="step-intro">Your chosen specializations shift these figures automatically. Food Production
-        adjustments aren't wired up yet - Energy Production below reflects your actual picks.</p>
+      <p class="step-intro">Your chosen specializations shift these figures automatically.</p>
       <div class="spec-chosen-summary" id="chosenSummary"><!-- populated by specialization.js --></div>
       <div class="adjust-row">
         <div class="adjust-field">
@@ -111,14 +110,14 @@
         </div>
         <div class="adjust-field">
           <label>Food Production</label>
-          <div class="adjust-controls">
-            <button class="adjust-btn" disabled>&minus;</button>
+          <div class="adjust-result">
+            <span class="adjust-original" id="adjFoodOriginal">&mdash;</span>
+            <span class="adjust-arrow">&rarr;</span>
             <span class="adjust-value" id="adjFoodValue">&mdash;</span>
-            <button class="adjust-btn" disabled>+</button>
           </div>
+          <div class="adjust-breakdown" id="adjFoodBreakdown"><!-- populated by specialization.js --></div>
         </div>
       </div>
-      <p class="spec-placeholder-note">(Food Production adjustment formulas will go here.)</p>
     </div>
 
     <!-- ===== Step 4: Adjust Population ===== -->
@@ -171,7 +170,7 @@
       <h3 class="mil-subheading">Next Steps</h3>
       <p class="step-intro">Send your Application to <a href="https://www.nationstates.net/nation=rylet" target="_blank" rel="noopener">Rylet</a> to await approval.</p>
 
-      <div class="quick-fill-row" style="justify-content: flex-start; text-align: left;">
+      <div class="quick-fill-row">
         <button type="button" class="btn-primary" id="copyFullApplicationBtn">Full Application</button>
       </div>
       <textarea id="fullApplicationSource" readonly></textarea>

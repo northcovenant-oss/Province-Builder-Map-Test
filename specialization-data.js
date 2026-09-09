@@ -15,7 +15,7 @@ const SPECIALIZATION_POOLS = {
   Primary: [
     "Agriculture - Animals",
     "Agriculture - Animal Products",
-    "Agriculture - Animal & Vegetable Bi-Products",
+    "Agriculture - Animal & Vegetable Byproducts",
     "Agriculture - Carbohydrate Products",
     "Agriculture - Fruits",
     "Agriculture - Sugar",
@@ -191,7 +191,7 @@ const IMPORTS_BY_SPECIALIZATION = {
   // -- Primary --
   "Agriculture - Animals": ["Animal Feed", "General Machinery", "Energy - Fossil Fuels"],
   "Agriculture - Animal Products": ["Agriculture - Animals", "Animal Feed", "General Machinery"],
-  "Agriculture - Animal & Vegetable Bi-Products": ["Agriculture - Animals", "Agriculture - Vegetables", "General Machinery"],
+  "Agriculture - Animal & Vegetable Byproducts": ["Agriculture - Animals", "Agriculture - Vegetables", "General Machinery"],
   "Agriculture - Carbohydrate Products": ["Automotive - Utility Vehicle", "Chemical - Commercial", "Energy - Fossil Fuels"],
   "Agriculture - Fruits": ["Automotive - Utility Vehicle", "Chemical - Commercial", "Energy - Fossil Fuels"],
   "Agriculture - Sugar": ["Automotive - Utility Vehicle", "Chemical - Commercial"],
@@ -258,7 +258,7 @@ const IMPORTS_BY_SPECIALIZATION = {
   "Foodstuffs - Frozen Food": ["Agriculture - Animal Products", "Agriculture - Fruits", "Agriculture - Vegetables", "Fishing - Aquaculture", "Energy - Fossil Fuels"],
   "Foodstuffs - Packaged Food": ["Agriculture - Carbohydrate Products", "Agriculture - Animal Products", "Consumer Goods - Plastics", "Cargo Transportation - Road"],
   "Foodstuffs - Snacks": ["Agriculture - Carbohydrate Products", "Agriculture - Fruits", "Consumer Goods - Plastics", "Cargo Transportation - Road"],
-  "Animal Feed": ["Agriculture - Carbohydrate Products", "Agriculture - Animal & Vegetable Bi-Products", "Chemical - Commodity"],
+  "Animal Feed": ["Agriculture - Carbohydrate Products", "Agriculture - Animal & Vegetable Byproducts", "Chemical - Commodity"],
   "Leather industry": ["Agriculture - Animals", "Chemical - Commercial", "Energy - Fossil Fuels"],
   "Attire - Accessories": ["Leather industry", "Textiles - Natural Fibers", "Metals - Refined Metals", "Consumer Goods - Plastics", "Fishing - Pearling"],
   "Attire - Clothing": ["Textiles - Cotton", "Textiles - Natural Fibers", "Textiles - Synthetic"],
@@ -593,6 +593,76 @@ function applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs){
 
   const adjustedTotal = Object.values(working).reduce((sum, v) => sum + v, 0) + flatBonusTotal;
   return { adjustedTotal, originalTotal, appliedFuelBonuses, appliedEnergyBonuses };
+}
+
+// ---- Food Production specializations ----
+//
+// Mirrors the Energy specialization mechanic exactly (not the Fuel
+// mechanic): each chosen Agriculture/Fishing specialization adds a flat,
+// rank-based bonus to Food Production, using the SAME flat values Energy
+// uses (ENERGY_FLAT_BONUS_BY_RANK - not a separate table, so the two
+// can't drift apart). What differs per specialization is an effect
+// multiplier reflecting how directly it represents staple food-growing
+// capacity versus a cash crop, luxury good, or already-processed product
+// that doesn't add to the claim's food supply the same way:
+//   - No effect (0x): cash/export crops and non-food goods - Pearling
+//     (pearls aren't food), Spices, Beverage Crops, and Sugar (grown for
+//     flavor/export/processing rather than caloric staple food).
+//   - Half effect (0.5x): partial contributors - Fruits (nutritious but
+//     not a staple caloric base), Animal & Vegetable Byproducts
+//     (byproducts, not primary food output), and Animal Products (dairy/
+//     eggs/wool - a real but secondary food contribution; meat itself is
+//     already counted at Agriculture - Animals, so this stays at half
+//     rather than full to avoid double-counting food from one livestock
+//     pick).
+//   - Full effect (1x): staple food production - Carbohydrate Products,
+//     Vegetables, Aquaculture, Fishing - Commercial, and Animals (raising
+//     livestock - this is where meat itself is counted, alongside the
+//     rest of the staple food a livestock operation produces).
+const FOOD_SPEC_EFFECT_MULTIPLIER = {
+  // No effect
+  "Fishing - Pearling": 0,
+  "Agriculture - Spices": 0,
+  "Agriculture - Beverage Crops": 0,
+  "Agriculture - Sugar": 0,
+  // Half effect
+  "Agriculture - Fruits": 0.5,
+  "Agriculture - Animal & Vegetable Byproducts": 0.5,
+  "Agriculture - Animal Products": 0.5,
+  // Full effect
+  "Agriculture - Carbohydrate Products": 1,
+  "Agriculture - Vegetables": 1,
+  "Fishing - Aquaculture": 1,
+  "Fishing - Commercial": 1,
+  "Agriculture - Animals": 1,
+};
+
+// Applies Food Production adjustments. originalFoodProduction is the
+// bio snapshot's numeric food total - unlike Energy, there's no
+// per-province food breakdown in the data contract, so this works off
+// a single aggregate number rather than summing per-province entries.
+// chosenSpecs: the 5 export-rank picks (same array Energy reads).
+// Returns { adjustedTotal, originalTotal, appliedFoodBonuses } -
+// appliedFoodBonuses includes every chosen Agriculture/Fishing spec
+// (even 0x ones), so the UI can show players why a pick had no effect
+// rather than just silently omitting it.
+function applyFoodSpecializationAdjustments(originalFoodProduction, chosenSpecs){
+  const originalTotal = Number(originalFoodProduction) || 0;
+  const appliedFoodBonuses = [];
+  let flatBonusTotal = 0;
+
+  (chosenSpecs || []).forEach((spec, i) => {
+    if (!spec) return;
+    if (!(spec in FOOD_SPEC_EFFECT_MULTIPLIER)) return;
+    const rank = i + 1;
+    const multiplier = FOOD_SPEC_EFFECT_MULTIPLIER[spec];
+    const bonus = ENERGY_FLAT_BONUS_BY_RANK[i] * multiplier;
+    flatBonusTotal += bonus;
+    appliedFoodBonuses.push({ spec, rank, bonus, multiplier });
+  });
+
+  const adjustedTotal = originalTotal + flatBonusTotal;
+  return { adjustedTotal, originalTotal, appliedFoodBonuses };
 }
 
 

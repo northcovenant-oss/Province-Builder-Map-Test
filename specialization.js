@@ -39,7 +39,6 @@
   document.getElementById('snapEnergy').textContent = snapshot.energyProduction || '\u2014';
   document.getElementById('snapFood').textContent = snapshot.foodProduction || '\u2014';
   document.getElementById('step1EconomyType').textContent = snapshot.economyType || '\u2014';
-  document.getElementById('adjFoodValue').textContent = snapshot.foodProduction || '\u2014';
 
   // ---- Step 1: one slot per World Exports rank, tied to that rank's sector ----
   // snapshot.worldExports is the bio's actual 1st-5th ranked export labels
@@ -592,6 +591,60 @@
     }
   }
 
+  function formatFoodValue(n){
+    const rounded = Math.round(n);
+    const sign = rounded >= 0 ? '+' : '';
+    const label = rounded < 0 ? 'Food Deficit' : rounded > 0 ? 'Food Surplus' : 'Food Balanced';
+    return sign + rounded + ' ' + label;
+  }
+
+  // Unlike Energy, there's no per-province food array in the snapshot
+  // contract - just the bio's single aggregate foodProduction figure, as
+  // a string like "+30 Food Surplus". This pulls the leading signed
+  // number back out so it can be used as a real starting total; returns
+  // null if the string doesn't start with a parseable number (missing or
+  // unrecognized snapshot data), same "can't adjust, show unchanged"
+  // fallback stance the Energy side takes for missing per-province data.
+  function parseFoodProductionNumber(raw){
+    if(!raw) return null;
+    const match = String(raw).match(/^([+-]?\d+)/);
+    if(!match) return null;
+    return parseInt(match[1], 10);
+  }
+
+  function renderFoodAdjustment(){
+    const originalEl = document.getElementById('adjFoodOriginal');
+    const valueEl = document.getElementById('adjFoodValue');
+    const breakdownEl = document.getElementById('adjFoodBreakdown');
+
+    const originalNumber = parseFoodProductionNumber(snapshot.foodProduction);
+    if(originalNumber === null){
+      const fallback = snapshot.foodProduction || '\u2014';
+      originalEl.textContent = fallback;
+      valueEl.textContent = fallback;
+      breakdownEl.textContent = 'This claim\u2019s Food Production figure isn\u2019t in a recognized format, so ' +
+        'specialization adjustments can\u2019t be calculated - showing the original total unchanged.';
+      return;
+    }
+
+    const result = applyFoodSpecializationAdjustments(originalNumber, chosenSpecs);
+    originalEl.textContent = formatFoodValue(result.originalTotal);
+    valueEl.textContent = formatFoodValue(result.adjustedTotal);
+
+    breakdownEl.innerHTML = '';
+    result.appliedFoodBonuses.forEach(function(b){
+      const line = document.createElement('span');
+      line.className = 'breakdown-item';
+      const displayRank = ordinal(displayRankByStorageRank[b.rank] || b.rank);
+      const effectNote = b.multiplier === 0 ? 'no effect' : b.multiplier === 1 ? 'full effect' : (b.multiplier + '\u00d7 effect');
+      line.textContent = b.spec + ' (' + displayRank + ') \u2014 +' + b.bonus + ' flat (' + effectNote + ')';
+      breakdownEl.appendChild(line);
+    });
+    if(result.appliedFoodBonuses.length === 0){
+      breakdownEl.textContent = 'No Agriculture or Fishing specialization chosen - total is unchanged.';
+    }
+  }
+
   // ---- Step 5: National Identity + Citizen Card BBC ----
   //
   // Matches the community's Citizen App Card template exactly - every
@@ -880,7 +933,7 @@
       dot.classList.toggle('done', dotStep < step);
     });
 
-    if(step === 3){ renderChosenSummary(); renderEnergyAdjustment(); }
+    if(step === 3){ renderChosenSummary(); renderEnergyAdjustment(); renderFoodAdjustment(); }
     if(step === 5) renderPotentialImports();
     updateNextButtonState();
   }

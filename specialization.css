@@ -409,21 +409,6 @@ body.spec-page {
   color: var(--ink-soft);
   margin-bottom: 6px;
 }
-.adjust-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.adjust-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  background: var(--panel-bg);
-  color: var(--ink-soft);
-  font-size: 16px;
-  cursor: not-allowed;
-}
 .adjust-value {
   font-family: var(--font-body);
   font-weight: 600;
@@ -560,13 +545,13 @@ body.spec-page {
   color: var(--ink);
   box-sizing: border-box;
 }
-#copyCitizenCardBtn {
+#copyFullApplicationBtn {
   margin-left: 0;
 }
-#copyCitizenCardBtn.copied {
+#copyFullApplicationBtn.copied {
   background: var(--gold-bright, var(--gold));
 }
-#citizenCardSource {
+#fullApplicationSource {
   width: 100%;
   min-height: 260px;
   margin-top: 10px;
