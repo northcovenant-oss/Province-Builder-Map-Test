@@ -691,15 +691,44 @@
     }
 
     const specResult = applyFoodSpecializationAdjustments(foodBaseNumber, chosenSpecs);
-    const popFoodResult = applyPopulationFoodAdjustment(specResult.adjustedTotal, populationPercent, provinceCount);
+    const popFoodResult = applyPopulationFoodAdjustment(specResult.adjustedTotal, populationPercent);
     popFoodOriginalEl.textContent = formatFoodValue(specResult.adjustedTotal);
     popFoodValueEl.textContent = formatFoodValue(popFoodResult.adjustedTotal);
 
     if(populationPercent === 0){
       popFoodBreakdownEl.textContent = 'Stable population - no additional Food Production change.';
     } else {
-      popFoodBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population across ' +
-        provinceCount + ' province' + (provinceCount === 1 ? '' : 's') + ' \u2192 ' + formatFoodValue(popFoodResult.adjustedTotal) + ' net.';
+      popFoodBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
+        formatFoodValue(popFoodResult.adjustedTotal) + ' net.';
+    }
+
+    // Energy Production responds to population the same way Food does -
+    // same shared formula (applyPopulationEnergyAdjustment), built on top
+    // of Step 3's already-specialization-adjusted Energy total.
+    const popEnergyOriginalEl = document.getElementById('adjPopEnergyOriginal');
+    const popEnergyValueEl = document.getElementById('adjPopEnergyValue');
+    const popEnergyBreakdownEl = document.getElementById('adjPopEnergyBreakdown');
+
+    const perProvinceEnergy = snapshot.perProvinceEnergy || [];
+    if(perProvinceEnergy.length === 0){
+      const fallback = snapshot.energyProduction || '\u2014';
+      popEnergyOriginalEl.textContent = fallback;
+      popEnergyValueEl.textContent = fallback;
+      popEnergyBreakdownEl.textContent = 'Per-province data isn\u2019t available for this claim, so the population ' +
+        'adjustment can\u2019t be calculated - showing the original total unchanged.';
+      return;
+    }
+
+    const energySpecResult = applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs);
+    const popEnergyResult = applyPopulationEnergyAdjustment(energySpecResult.adjustedTotal, populationPercent);
+    popEnergyOriginalEl.textContent = formatEnergyValue(energySpecResult.adjustedTotal);
+    popEnergyValueEl.textContent = formatEnergyValue(popEnergyResult.adjustedTotal);
+
+    if(populationPercent === 0){
+      popEnergyBreakdownEl.textContent = 'Stable population - no additional Energy Production change.';
+    } else {
+      popEnergyBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
+        formatEnergyValue(popEnergyResult.adjustedTotal) + ' net.';
     }
   }
 

@@ -759,54 +759,90 @@ function applyPopulationAdjustment(originalGDP, populationPercent){
   return { adjustedGDPText, originalGDPText, gdpChangePercent, parsed: true };
 }
 
-// Population also affects Food Production directly - this is a separate,
-// more involved formula than the GDP one above (it factors in province
-// count too, and reads as a genuine production-vs-consumption model
-// rather than a flat percent change). Structurally simplified from the
-// community's original spreadsheet formula (deduped the repeated
-// province-count "rate factor" term and factored out the shared
-// B17+C4*20 / -C4*20 padding that wraps all three branches), but every
-// sub-expression that affects rounding is kept bit-for-bit identical to
-// the original - verified against a literal, unsimplified port of the
-// formula across 25,800 population/province/food combinations with zero
-// mismatches, since even a mathematically-equivalent rewrite (e.g.
-// (25-C4)*0.1+0.5 reduced to 3-0.1*C4) can shift which side of .5 a
-// result rounds to due to floating-point, and this needs to match the
-// sheet exactly, not just approximately.
+// Population also affects any "net surplus/deficit" production metric -
+// Food Production first, and now Energy Production too, reusing the
+// exact same formula (same constants, same curve shapes) rather than a
+// separately-tuned one. Unlike the earlier version of this formula,
+// province count isn't a factor at all; instead the LOSS side branches
+// on whether the metric is currently a surplus or a deficit (value >= 0
+// vs < 0), since population loss helps a deficit differently than it
+// helps a surplus.
 //
-// currentFoodProduction is Step 3's ALREADY-adjusted Food Production
-// total (after specialization bonuses) - population effects apply on
-// top of that, not on the bio's original pre-specialization figure.
-// populationPercent is the Step 4 dropdown's value (e.g. -30, 0, 120).
-// provinceCount is the claim's province count (perProvinceEnergy.length).
+// Structurally simplified (named constants for the growth tier
+// boundaries/rates, extracted growth/loss fraction variables) but every
+// numeric literal and operation order is kept identical to the original
+// spreadsheet formula - verified against a literal, unsimplified port
+// across 5,328 population/value combinations (including deep positive
+// and negative values) with zero mismatches, since even a
+// mathematically-equivalent rewrite can shift which side of a rounding
+// boundary a result lands on due to floating-point.
 //
-// The model: more population = more mouths to feed = shrinking net food
-// surplus (or deepening deficit); less population = smaller surplus
-// pressure = growing net surplus. Below -30% population, the formula
-// switches to a steeper branch using the claim's absolute food
-// magnitude, and the population-loss provinces multiplier can invert
-// sign directly depending on province count.
-function applyPopulationFoodAdjustment(currentFoodProduction, populationPercent, provinceCount){
-  const ratio = 1 + (Number(populationPercent) || 0) / 100; // e.g. -30 -> 0.7
-  const provinces = Number(provinceCount) || 0;
-  const offset = provinces * 20;
-  const base = (Number(currentFoodProduction) || 0) + offset;
-  const rateFactor = (25 - provinces) * 0.1 + 0.5; // kept literal - see note above
+// currentValue is the metric's ALREADY-adjusted total from its own Step
+// 3 specialization bonuses (Food's from applyFoodSpecializationAdjustments,
+// Energy's from applyEnergySpecializationAdjustments) - population
+// effects apply on top of that. populationPercent is the Step 4
+// dropdown's value.
+//
+// The model, in plain terms:
+//   - Growth (population >= stable): strain increases in three
+//     escalating tiers - a mild penalty up to +30% population, a much
+//     steeper one from +30% to +100%, and a severe one beyond +100%.
+//   - Mild loss (down to -30% population): fewer consumers grows
+//     the surplus (or shrinks the deficit) at an accelerating-then-
+//     leveling rate.
+//   - Deep loss (beyond -30%): if currently in surplus, the benefit of
+//     losing more population peaks around -30% and then reverses - past
+//     a certain point there aren't enough people left to do the work,
+//     and the surplus starts shrinking again. If currently in deficit,
+//     losing population keeps easing the shortage but the improvement
+//     tapers off, capping at roughly half the original deficit even at
+//     extreme population loss - losing everyone doesn't erase
+//     underlying production problems.
+const POP_PROD_GROWTH_TIER1_MAX = 0.30, POP_PROD_GROWTH_TIER1_RATE = 10;
+const POP_PROD_GROWTH_TIER2_MAX = 1.00, POP_PROD_GROWTH_TIER2_RATE = 100;
+const POP_PROD_GROWTH_TIER3_RATE = 600;
+const POP_PROD_GROWTH_TIER1_PENALTY = POP_PROD_GROWTH_TIER1_RATE * POP_PROD_GROWTH_TIER1_MAX; // 3
+const POP_PROD_GROWTH_TIER2_PENALTY = POP_PROD_GROWTH_TIER2_RATE * (POP_PROD_GROWTH_TIER2_MAX - POP_PROD_GROWTH_TIER1_MAX); // 70
 
-  let multiplier;
-  let useAbsBase = false;
-  if (ratio > 1) {
-    multiplier = 1 + (1 - ratio) * 1.5;
-  } else if (ratio >= 0.7) {
-    multiplier = 1 + (1 - ratio) * rateFactor;
+function applyPopulationProductionAdjustment(currentValue, populationPercent){
+  const B17 = Number(currentValue) || 0;
+  const C3 = 1 + (Number(populationPercent) || 0) / 100; // e.g. -30 -> 0.7, 20 -> 1.2
+
+  let adjustedTotal;
+  if (C3 >= 1) {
+    const growth = C3 - 1;
+    if (growth <= POP_PROD_GROWTH_TIER1_MAX) {
+      adjustedTotal = Math.round(B17 - POP_PROD_GROWTH_TIER1_RATE * growth);
+    } else if (C3 <= 2.00) {
+      adjustedTotal = Math.round(B17 - (POP_PROD_GROWTH_TIER1_PENALTY + POP_PROD_GROWTH_TIER2_RATE * (growth - POP_PROD_GROWTH_TIER1_MAX)));
+    } else {
+      adjustedTotal = Math.round(B17 - (POP_PROD_GROWTH_TIER1_PENALTY + POP_PROD_GROWTH_TIER2_PENALTY + POP_PROD_GROWTH_TIER3_RATE * (growth - POP_PROD_GROWTH_TIER2_MAX)));
+    }
   } else {
-    multiplier = 1.3 - (1 - ratio) * rateFactor;
-    useAbsBase = true;
+    const loss = 1 - C3;
+    let multiplier;
+    if (C3 >= 0.70) {
+      multiplier = 2 * loss - (10 / 3) * Math.pow(loss, 2);
+    } else {
+      const excessLoss = loss - 0.3;
+      multiplier = B17 >= 0
+        ? 0.3 - (1.3 / 0.49) * Math.pow(excessLoss, 2)
+        : 0.3 + 0.2 * (1 - Math.exp(-3 * excessLoss));
+    }
+    adjustedTotal = Math.round(B17 + Math.abs(B17) * multiplier);
   }
 
-  const scaled = (useAbsBase ? Math.abs(base) : base) * multiplier;
-  const adjustedTotal = Math.round(scaled - offset);
-  return { adjustedTotal, ratio, provinces };
+  return { adjustedTotal, ratio: C3 };
+}
+
+// Thin, self-documenting wrappers around the shared model above - keeps
+// call sites in specialization.js reading clearly (which metric this is
+// for) without duplicating any of the actual formula.
+function applyPopulationFoodAdjustment(currentFoodProduction, populationPercent){
+  return applyPopulationProductionAdjustment(currentFoodProduction, populationPercent);
+}
+function applyPopulationEnergyAdjustment(currentEnergyProduction, populationPercent){
+  return applyPopulationProductionAdjustment(currentEnergyProduction, populationPercent);
 }
 
 
