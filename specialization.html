@@ -123,8 +123,8 @@
     <!-- ===== Step 4: Adjust Population ===== -->
     <div class="spec-card step-panel" id="step4" data-step-panel="4" hidden>
       <h2>Step 4 &middot; Adjust Population</h2>
-      <p class="step-intro">Choosing a population level away from your stable population affects GDP below.
-        Energy and Food Production aren't affected by population yet.</p>
+      <p class="step-intro">Choosing a population level away from your stable population affects GDP and Food
+        Production below. Energy Production isn't affected by population yet.</p>
       <div class="pop-adjust-row">
         <label for="specPopAdjust">Population level</label>
         <select id="specPopAdjust">
@@ -161,6 +161,15 @@
             <span class="adjust-value" id="adjGDPValue">&mdash;</span>
           </div>
           <div class="adjust-breakdown" id="adjGDPBreakdown"><!-- populated by specialization.js --></div>
+        </div>
+        <div class="adjust-field">
+          <label>Food Production</label>
+          <div class="adjust-result">
+            <span class="adjust-original" id="adjPopFoodOriginal">&mdash;</span>
+            <span class="adjust-arrow">&rarr;</span>
+            <span class="adjust-value" id="adjPopFoodValue">&mdash;</span>
+          </div>
+          <div class="adjust-breakdown" id="adjPopFoodBreakdown"><!-- populated by specialization.js --></div>
         </div>
       </div>
     </div>

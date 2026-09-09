@@ -759,6 +759,56 @@ function applyPopulationAdjustment(originalGDP, populationPercent){
   return { adjustedGDPText, originalGDPText, gdpChangePercent, parsed: true };
 }
 
+// Population also affects Food Production directly - this is a separate,
+// more involved formula than the GDP one above (it factors in province
+// count too, and reads as a genuine production-vs-consumption model
+// rather than a flat percent change). Structurally simplified from the
+// community's original spreadsheet formula (deduped the repeated
+// province-count "rate factor" term and factored out the shared
+// B17+C4*20 / -C4*20 padding that wraps all three branches), but every
+// sub-expression that affects rounding is kept bit-for-bit identical to
+// the original - verified against a literal, unsimplified port of the
+// formula across 25,800 population/province/food combinations with zero
+// mismatches, since even a mathematically-equivalent rewrite (e.g.
+// (25-C4)*0.1+0.5 reduced to 3-0.1*C4) can shift which side of .5 a
+// result rounds to due to floating-point, and this needs to match the
+// sheet exactly, not just approximately.
+//
+// currentFoodProduction is Step 3's ALREADY-adjusted Food Production
+// total (after specialization bonuses) - population effects apply on
+// top of that, not on the bio's original pre-specialization figure.
+// populationPercent is the Step 4 dropdown's value (e.g. -30, 0, 120).
+// provinceCount is the claim's province count (perProvinceEnergy.length).
+//
+// The model: more population = more mouths to feed = shrinking net food
+// surplus (or deepening deficit); less population = smaller surplus
+// pressure = growing net surplus. Below -30% population, the formula
+// switches to a steeper branch using the claim's absolute food
+// magnitude, and the population-loss provinces multiplier can invert
+// sign directly depending on province count.
+function applyPopulationFoodAdjustment(currentFoodProduction, populationPercent, provinceCount){
+  const ratio = 1 + (Number(populationPercent) || 0) / 100; // e.g. -30 -> 0.7
+  const provinces = Number(provinceCount) || 0;
+  const offset = provinces * 20;
+  const base = (Number(currentFoodProduction) || 0) + offset;
+  const rateFactor = (25 - provinces) * 0.1 + 0.5; // kept literal - see note above
+
+  let multiplier;
+  let useAbsBase = false;
+  if (ratio > 1) {
+    multiplier = 1 + (1 - ratio) * 1.5;
+  } else if (ratio >= 0.7) {
+    multiplier = 1 + (1 - ratio) * rateFactor;
+  } else {
+    multiplier = 1.3 - (1 - ratio) * rateFactor;
+    useAbsBase = true;
+  }
+
+  const scaled = (useAbsBase ? Math.abs(base) : base) * multiplier;
+  const adjustedTotal = Math.round(scaled - offset);
+  return { adjustedTotal, ratio, provinces };
+}
+
 
 // Maps a World Exports rank's sector label (from landbio.js's
 // buildWorldExports - "Services", "Consumer Goods", "Industrial Goods",

@@ -662,15 +662,45 @@
     if(!result.parsed){
       breakdownEl.textContent = 'This claim\u2019s GDP figure isn\u2019t in a recognized format, so the population ' +
         'adjustment can\u2019t be calculated - showing the original total unchanged.';
-      return;
-    }
-    if(populationPercent === 0){
+    } else if(populationPercent === 0){
       breakdownEl.textContent = 'Stable population - no GDP change.';
+    } else {
+      const sign = result.gdpChangePercent >= 0 ? '+' : '';
+      breakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
+        sign + (Math.round(result.gdpChangePercent * 100) / 100) + '% GDP';
+    }
+
+    // Food Production also responds to population - builds on top of
+    // Step 3's already-specialization-adjusted total (not the bio's raw
+    // pre-specialization figure), same "population effects layer on top
+    // of specialization effects" ordering the GDP side doesn't need to
+    // worry about, since GDP has no earlier per-step adjustment of its
+    // own to build on.
+    const popFoodOriginalEl = document.getElementById('adjPopFoodOriginal');
+    const popFoodValueEl = document.getElementById('adjPopFoodValue');
+    const popFoodBreakdownEl = document.getElementById('adjPopFoodBreakdown');
+
+    const foodBaseNumber = parseFoodProductionNumber(snapshot.foodProduction);
+    if(foodBaseNumber === null){
+      const fallback = snapshot.foodProduction || '\u2014';
+      popFoodOriginalEl.textContent = fallback;
+      popFoodValueEl.textContent = fallback;
+      popFoodBreakdownEl.textContent = 'This claim\u2019s Food Production figure isn\u2019t in a recognized format, ' +
+        'so the population adjustment can\u2019t be calculated - showing the original total unchanged.';
       return;
     }
-    const sign = result.gdpChangePercent >= 0 ? '+' : '';
-    breakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
-      sign + (Math.round(result.gdpChangePercent * 100) / 100) + '% GDP';
+
+    const specResult = applyFoodSpecializationAdjustments(foodBaseNumber, chosenSpecs);
+    const popFoodResult = applyPopulationFoodAdjustment(specResult.adjustedTotal, populationPercent, provinceCount);
+    popFoodOriginalEl.textContent = formatFoodValue(specResult.adjustedTotal);
+    popFoodValueEl.textContent = formatFoodValue(popFoodResult.adjustedTotal);
+
+    if(populationPercent === 0){
+      popFoodBreakdownEl.textContent = 'Stable population - no additional Food Production change.';
+    } else {
+      popFoodBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population across ' +
+        provinceCount + ' province' + (provinceCount === 1 ? '' : 's') + ' \u2192 ' + formatFoodValue(popFoodResult.adjustedTotal) + ' net.';
+    }
   }
 
   specPopAdjustEl.addEventListener('change', renderPopulationAdjustment);
