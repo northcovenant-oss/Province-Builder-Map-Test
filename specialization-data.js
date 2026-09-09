@@ -680,13 +680,13 @@ function applyFoodSpecializationAdjustments(originalFoodProduction, chosenSpecs)
 // population is 3 steps at each of the three rates (-9% - 15% - 45%)
 // = -69% GDP.
 // Population growth is simpler and linear, no brackets: +5% GDP per
-// +100% population.
+// +10% population.
 const POPULATION_LOSS_GDP_TIERS = [
   { thresholdPercent: 30, gdpPercentPer10: 3 },  // 0 to -30% population
   { thresholdPercent: 30, gdpPercentPer10: 5 },  // -30% to -60% population
   { thresholdPercent: 30, gdpPercentPer10: 15 }, // -60% to -90% population (and beyond, at this same rate)
 ];
-const POPULATION_GAIN_GDP_PERCENT_PER_100 = 5;
+const POPULATION_GAIN_GDP_PERCENT_PER_10 = 5;
 
 // populationLossPercent is a POSITIVE number representing how much
 // population was lost (e.g. pass 50 for a -50% population selection).
@@ -709,7 +709,7 @@ function gdpLossPercentForPopulationLoss(populationLossPercent){
 // loss) for a given population percent change (e.g. -50 or +120).
 function gdpPercentChangeForPopulationChange(populationPercent){
   if (populationPercent === 0) return 0;
-  if (populationPercent > 0) return (populationPercent / 100) * POPULATION_GAIN_GDP_PERCENT_PER_100;
+  if (populationPercent > 0) return (populationPercent / 10) * POPULATION_GAIN_GDP_PERCENT_PER_10;
   return -gdpLossPercentForPopulationLoss(-populationPercent);
 }
 
