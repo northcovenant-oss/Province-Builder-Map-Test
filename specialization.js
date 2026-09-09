@@ -645,6 +645,36 @@
     }
   }
 
+  // ---- Step 4: population -> GDP adjustment ----
+  const specPopAdjustEl = document.getElementById('specPopAdjust');
+
+  function renderPopulationAdjustment(){
+    const originalEl = document.getElementById('adjGDPOriginal');
+    const valueEl = document.getElementById('adjGDPValue');
+    const breakdownEl = document.getElementById('adjGDPBreakdown');
+
+    const populationPercent = parseInt(specPopAdjustEl.value, 10);
+    const result = applyPopulationAdjustment(snapshot.gdp, populationPercent);
+
+    originalEl.textContent = result.originalGDPText;
+    valueEl.textContent = result.adjustedGDPText;
+
+    if(!result.parsed){
+      breakdownEl.textContent = 'This claim\u2019s GDP figure isn\u2019t in a recognized format, so the population ' +
+        'adjustment can\u2019t be calculated - showing the original total unchanged.';
+      return;
+    }
+    if(populationPercent === 0){
+      breakdownEl.textContent = 'Stable population - no GDP change.';
+      return;
+    }
+    const sign = result.gdpChangePercent >= 0 ? '+' : '';
+    breakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
+      sign + (Math.round(result.gdpChangePercent * 100) / 100) + '% GDP';
+  }
+
+  specPopAdjustEl.addEventListener('change', renderPopulationAdjustment);
+
   // ---- Step 5: National Identity + Citizen Card BBC ----
   //
   // Matches the community's Citizen App Card template exactly - every
@@ -934,6 +964,7 @@
     });
 
     if(step === 3){ renderChosenSummary(); renderEnergyAdjustment(); renderFoodAdjustment(); }
+    if(step === 4) renderPopulationAdjustment();
     if(step === 5) renderPotentialImports();
     updateNextButtonState();
   }

@@ -665,6 +665,100 @@ function applyFoodSpecializationAdjustments(originalFoodProduction, chosenSpecs)
   return { adjustedTotal, originalTotal, appliedFoodBonuses };
 }
 
+// ---- Population / GDP adjustment (Step 4) ----
+//
+// Population loss shrinks GDP at a progressive (tax-bracket-style) rate
+// that gets steeper the more population is lost - losing the first 30%
+// hurts proportionally less than losing the next 30%, which hurts less
+// than the last 30%:
+//   - 0% to -30% population: -3% GDP per -10% population
+//   - -30% to -60% population: -5% GDP per -10% population
+//   - -60% to -90% population: -15% GDP per -10% population
+// These stack cumulatively, not as a flat rate applied to the whole
+// loss - e.g. -50% population is 3 full -10% steps at the first rate
+// (-9%) plus 2 steps at the second rate (-10%) = -19% GDP, and -90%
+// population is 3 steps at each of the three rates (-9% - 15% - 45%)
+// = -69% GDP.
+// Population growth is simpler and linear, no brackets: +5% GDP per
+// +100% population.
+const POPULATION_LOSS_GDP_TIERS = [
+  { thresholdPercent: 30, gdpPercentPer10: 3 },  // 0 to -30% population
+  { thresholdPercent: 30, gdpPercentPer10: 5 },  // -30% to -60% population
+  { thresholdPercent: 30, gdpPercentPer10: 15 }, // -60% to -90% population (and beyond, at this same rate)
+];
+const POPULATION_GAIN_GDP_PERCENT_PER_100 = 5;
+
+// populationLossPercent is a POSITIVE number representing how much
+// population was lost (e.g. pass 50 for a -50% population selection).
+// Walks the tiers above cumulatively and returns the total GDP percent
+// lost (also positive/positive-meaning-loss, e.g. 19 for a -50% input).
+function gdpLossPercentForPopulationLoss(populationLossPercent){
+  let remaining = populationLossPercent;
+  let totalLossPercent = 0;
+  for (let i = 0; i < POPULATION_LOSS_GDP_TIERS.length && remaining > 0; i++) {
+    const tier = POPULATION_LOSS_GDP_TIERS[i];
+    const isLastTier = i === POPULATION_LOSS_GDP_TIERS.length - 1;
+    const stepInThisTier = isLastTier ? remaining : Math.min(remaining, tier.thresholdPercent);
+    totalLossPercent += (stepInThisTier / 10) * tier.gdpPercentPer10;
+    remaining -= stepInThisTier;
+  }
+  return totalLossPercent;
+}
+
+// Returns the net GDP percent CHANGE (positive for growth, negative for
+// loss) for a given population percent change (e.g. -50 or +120).
+function gdpPercentChangeForPopulationChange(populationPercent){
+  if (populationPercent === 0) return 0;
+  if (populationPercent > 0) return (populationPercent / 100) * POPULATION_GAIN_GDP_PERCENT_PER_100;
+  return -gdpLossPercentForPopulationLoss(-populationPercent);
+}
+
+// Parses a GDP display string like "$1.2B", "$500M", "$45,000,000", or a
+// plain number into { dollarSign, number, suffix, hadCommas } so an
+// adjusted value can be reformatted in the same style. Returns null if
+// the string doesn't start with a recognizable number - same "can't
+// adjust, show unchanged" fallback stance the Energy/Food adjustments
+// take toward snapshot data that isn't in an expected format, since GDP
+// has never been parsed as a number anywhere else in this file either.
+function parseGDPString(raw){
+  if (!raw) return null;
+  const match = String(raw).trim().match(/^(\$?)(-?[\d,]+(?:\.\d+)?)\s*([KMBTkmbt]?)/);
+  if (!match) return null;
+  const numberPart = parseFloat(match[2].replace(/,/g, ''));
+  if (isNaN(numberPart)) return null;
+  return { dollarSign: match[1], number: numberPart, suffix: match[3], hadCommas: match[2].indexOf(',') !== -1 };
+}
+
+// Reformats newNumber in the same style parseGDPString detected -
+// comma-grouped if the original was, otherwise a plain number (rounded
+// to 2 decimal places, matching how abbreviated forms like "$1.2B" are
+// usually written) - carrying over the original's $ sign and K/M/B/T
+// suffix untouched.
+function formatGDPValue(parsed, newNumber){
+  const numStr = parsed.hadCommas && !parsed.suffix
+    ? Math.round(newNumber).toLocaleString('en-US')
+    : String(Math.round(newNumber * 100) / 100);
+  return parsed.dollarSign + numStr + parsed.suffix;
+}
+
+// originalGDP: the bio snapshot's raw GDP string (snapshot.gdp).
+// populationPercent: the Step 4 dropdown's selected value (e.g. -50, 0, 120).
+// Returns { adjustedGDPText, originalGDPText, gdpChangePercent, parsed }.
+// When the GDP string can't be parsed, parsed is false and both text
+// fields just echo the original unchanged, mirroring the Food adjustment's
+// fallback behavior for unrecognized snapshot data.
+function applyPopulationAdjustment(originalGDP, populationPercent){
+  const originalGDPText = originalGDP || '\u2014';
+  const parsed = parseGDPString(originalGDP);
+  if (!parsed) {
+    return { adjustedGDPText: originalGDPText, originalGDPText: originalGDPText, gdpChangePercent: null, parsed: false };
+  }
+  const gdpChangePercent = gdpPercentChangeForPopulationChange(populationPercent);
+  const newNumber = parsed.number * (1 + gdpChangePercent / 100);
+  const adjustedGDPText = formatGDPValue(parsed, newNumber);
+  return { adjustedGDPText, originalGDPText, gdpChangePercent, parsed: true };
+}
+
 
 // Maps a World Exports rank's sector label (from landbio.js's
 // buildWorldExports - "Services", "Consumer Goods", "Industrial Goods",
