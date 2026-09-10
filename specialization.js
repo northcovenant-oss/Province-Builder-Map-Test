@@ -22,23 +22,34 @@
   specApp.hidden = false;
 
   // ---- populate the read-only snapshot header ----
-  // Nation is entered on Step 5 now (grouped with Capital/Classification/
+  // Nation is entered on Step 5 (grouped with Capital/Classification/
   // Government Type), not on the bio page - snapshot.nation is only used
-  // as a pre-fill fallback for old snapshots that still have it. The
-  // header stays live-updated as the player types it in on Step 5.
+  // as a pre-fill fallback for old snapshots that still have it. It's no
+  // longer shown in the top snapshot box - that slot now shows Provinces
+  // instead, which doesn't change as the player types, so it's just set
+  // once below.
   const identityNationEl = document.getElementById('identityNation');
   if(snapshot.nation) identityNationEl.value = snapshot.nation;
-  function updateNationHeader(){
-    document.getElementById('snapNation').textContent = identityNationEl.value.trim() || 'Unnamed Nation';
-  }
-  updateNationHeader();
-  identityNationEl.addEventListener('input', updateNationHeader);
   document.getElementById('snapEconomy').textContent = snapshot.economyType || '\u2014';
   document.getElementById('snapPopulation').textContent = snapshot.population || '\u2014';
   document.getElementById('snapGDP').textContent = snapshot.gdp || '\u2014';
   document.getElementById('snapEnergy').textContent = snapshot.energyProduction || '\u2014';
   document.getElementById('snapFood').textContent = snapshot.foodProduction || '\u2014';
   document.getElementById('step1EconomyType').textContent = snapshot.economyType || '\u2014';
+
+  // Parses a population figure like "5,000,000" or "5000000" into a
+  // plain number; returns null if unrecognized (same fallback stance as
+  // the GDP/Food parsers elsewhere in this file).
+  function parsePopulationNumber(raw){
+    if(!raw) return null;
+    const match = String(raw).trim().match(/^(-?[\d,]+)/);
+    if(!match) return null;
+    const n = parseInt(match[1].replace(/,/g, ''), 10);
+    return isNaN(n) ? null : n;
+  }
+  function formatPopulationValue(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
 
   // ---- Step 1: one slot per World Exports rank, tied to that rank's sector ----
   // snapshot.worldExports is the bio's actual 1st-5th ranked export labels
@@ -87,6 +98,7 @@
   // array position automatically.
   const SMALL_CLAIM_PROVINCE_THRESHOLD = 10;
   const provinceCount = (snapshot.perProvinceEnergy || []).length;
+  document.getElementById('snapProvinces').textContent = provinceCount > 0 ? String(provinceCount) : '\u2014';
   // Only restrict when province count is actually known (>0) - an older
   // snapshot with no per-province data at all can't be judged as "small",
   // so it falls back to the normal 5 slots rather than being guessed at.
@@ -355,6 +367,7 @@
     status.classList.add('filled');
     refreshDuplicateState();
     updateNextButtonState();
+    updateSnapshotBox(computeCurrentAdjustments());
   });
 
   // ---- Step 2: Military Doctrine (Priority + Stance) ----
@@ -648,91 +661,138 @@
   // ---- Step 4: population -> GDP adjustment ----
   const specPopAdjustEl = document.getElementById('specPopAdjust');
 
-  function renderPopulationAdjustment(){
-    const originalEl = document.getElementById('adjGDPOriginal');
-    const valueEl = document.getElementById('adjGDPValue');
-    const breakdownEl = document.getElementById('adjGDPBreakdown');
-
+  // Single source of truth for every population-affected total - GDP,
+  // Population itself, Food Production, and Energy Production - so Step
+  // 4's own display and the persistent snapshot box at the top of the
+  // page can never show different numbers for the same picks. Pure
+  // computation, no DOM writes.
+  function computeCurrentAdjustments(){
     const populationPercent = parseInt(specPopAdjustEl.value, 10);
-    const result = applyPopulationAdjustment(snapshot.gdp, populationPercent);
 
-    originalEl.textContent = result.originalGDPText;
-    valueEl.textContent = result.adjustedGDPText;
+    const gdp = applyPopulationAdjustment(snapshot.gdp, populationPercent);
 
-    if(!result.parsed){
-      breakdownEl.textContent = 'This claim\u2019s GDP figure isn\u2019t in a recognized format, so the population ' +
-        'adjustment can\u2019t be calculated - showing the original total unchanged.';
-    } else if(populationPercent === 0){
-      breakdownEl.textContent = 'Stable population - no GDP change.';
-    } else {
-      const sign = result.gdpChangePercent >= 0 ? '+' : '';
-      breakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
-        sign + (Math.round(result.gdpChangePercent * 100) / 100) + '% GDP';
+    const populationBase = parsePopulationNumber(snapshot.population);
+    const population = populationBase === null ? null : {
+      originalNumber: populationBase,
+      adjustedNumber: Math.round(populationBase * (1 + populationPercent / 100)),
+    };
+
+    const foodBase = parseFoodProductionNumber(snapshot.foodProduction);
+    let food = null;
+    if(foodBase !== null){
+      const specResult = applyFoodSpecializationAdjustments(foodBase, chosenSpecs);
+      const popResult = applyPopulationFoodAdjustment(specResult.adjustedTotal, populationPercent);
+      food = { step3Total: specResult.adjustedTotal, adjustedTotal: popResult.adjustedTotal };
     }
 
-    // Food Production also responds to population - builds on top of
-    // Step 3's already-specialization-adjusted total (not the bio's raw
-    // pre-specialization figure), same "population effects layer on top
-    // of specialization effects" ordering the GDP side doesn't need to
-    // worry about, since GDP has no earlier per-step adjustment of its
-    // own to build on.
+    const perProvinceEnergy = snapshot.perProvinceEnergy || [];
+    let energy = null;
+    if(perProvinceEnergy.length > 0){
+      const specResult = applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs);
+      const popResult = applyPopulationEnergyAdjustment(specResult.adjustedTotal, populationPercent);
+      energy = { step3Total: specResult.adjustedTotal, adjustedTotal: popResult.adjustedTotal };
+    }
+
+    return { populationPercent, gdp, population, food, energy };
+  }
+
+  // The persistent snapshot box at the top of the page (visible on every
+  // step, not just Step 4) - always shows the CURRENT totals given
+  // whatever's been picked so far, not the bio's frozen original figures.
+  // Provinces and Economy Type don't change from any player choice, so
+  // they're set once elsewhere and left alone here.
+  function updateSnapshotBox(totals){
+    document.getElementById('snapPopulation').textContent = totals.population
+      ? formatPopulationValue(totals.population.adjustedNumber) : (snapshot.population || '\u2014');
+    document.getElementById('snapGDP').textContent = totals.gdp.parsed
+      ? totals.gdp.adjustedGDPText : (snapshot.gdp || '\u2014');
+    document.getElementById('snapEnergy').textContent = totals.energy
+      ? formatEnergyValue(totals.energy.adjustedTotal) : (snapshot.energyProduction || '\u2014');
+    document.getElementById('snapFood').textContent = totals.food
+      ? formatFoodValue(totals.food.adjustedTotal) : (snapshot.foodProduction || '\u2014');
+  }
+
+  function renderPopulationAdjustment(){
+    const totals = computeCurrentAdjustments();
+    const populationPercent = totals.populationPercent;
+
+    // Population itself
+    const popOriginalEl = document.getElementById('adjPopulationOriginal');
+    const popValueEl = document.getElementById('adjPopulationValue');
+    const popBreakdownEl = document.getElementById('adjPopulationBreakdown');
+    if(!totals.population){
+      const fallback = snapshot.population || '\u2014';
+      popOriginalEl.textContent = fallback;
+      popValueEl.textContent = fallback;
+      popBreakdownEl.textContent = 'This claim\u2019s Population figure isn\u2019t in a recognized format, so it ' +
+        'can\u2019t be adjusted - showing the original unchanged.';
+    } else {
+      popOriginalEl.textContent = formatPopulationValue(totals.population.originalNumber);
+      popValueEl.textContent = formatPopulationValue(totals.population.adjustedNumber);
+      popBreakdownEl.textContent = populationPercent === 0
+        ? 'Stable population - no change.'
+        : (populationPercent > 0 ? '+' : '') + populationPercent + '% \u2192 ' + formatPopulationValue(totals.population.adjustedNumber);
+    }
+
+    // GDP
+    const gdpOriginalEl = document.getElementById('adjGDPOriginal');
+    const gdpValueEl = document.getElementById('adjGDPValue');
+    const gdpBreakdownEl = document.getElementById('adjGDPBreakdown');
+    gdpOriginalEl.textContent = totals.gdp.originalGDPText;
+    gdpValueEl.textContent = totals.gdp.adjustedGDPText;
+    if(!totals.gdp.parsed){
+      gdpBreakdownEl.textContent = 'This claim\u2019s GDP figure isn\u2019t in a recognized format, so the population ' +
+        'adjustment can\u2019t be calculated - showing the original total unchanged.';
+    } else if(populationPercent === 0){
+      gdpBreakdownEl.textContent = 'Stable population - no GDP change.';
+    } else {
+      const sign = totals.gdp.gdpChangePercent >= 0 ? '+' : '';
+      gdpBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
+        sign + (Math.round(totals.gdp.gdpChangePercent * 100) / 100) + '% GDP';
+    }
+
+    // Food Production - builds on top of Step 3's already-specialization-
+    // adjusted total, not the bio's raw pre-specialization figure.
     const popFoodOriginalEl = document.getElementById('adjPopFoodOriginal');
     const popFoodValueEl = document.getElementById('adjPopFoodValue');
     const popFoodBreakdownEl = document.getElementById('adjPopFoodBreakdown');
-
-    const foodBaseNumber = parseFoodProductionNumber(snapshot.foodProduction);
-    if(foodBaseNumber === null){
+    if(!totals.food){
       const fallback = snapshot.foodProduction || '\u2014';
       popFoodOriginalEl.textContent = fallback;
       popFoodValueEl.textContent = fallback;
       popFoodBreakdownEl.textContent = 'This claim\u2019s Food Production figure isn\u2019t in a recognized format, ' +
         'so the population adjustment can\u2019t be calculated - showing the original total unchanged.';
-      return;
-    }
-
-    const specResult = applyFoodSpecializationAdjustments(foodBaseNumber, chosenSpecs);
-    const popFoodResult = applyPopulationFoodAdjustment(specResult.adjustedTotal, populationPercent);
-    popFoodOriginalEl.textContent = formatFoodValue(specResult.adjustedTotal);
-    popFoodValueEl.textContent = formatFoodValue(popFoodResult.adjustedTotal);
-
-    if(populationPercent === 0){
-      popFoodBreakdownEl.textContent = 'Stable population - no additional Food Production change.';
     } else {
-      popFoodBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
-        formatFoodValue(popFoodResult.adjustedTotal) + ' net.';
+      popFoodOriginalEl.textContent = formatFoodValue(totals.food.step3Total);
+      popFoodValueEl.textContent = formatFoodValue(totals.food.adjustedTotal);
+      popFoodBreakdownEl.textContent = populationPercent === 0
+        ? 'Stable population - no additional Food Production change.'
+        : (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' + formatFoodValue(totals.food.adjustedTotal) + ' net.';
     }
 
-    // Energy Production responds to population the same way Food does -
-    // same shared formula (applyPopulationEnergyAdjustment), built on top
-    // of Step 3's already-specialization-adjusted Energy total.
+    // Energy Production - same pattern as Food, built on Step 3's total.
     const popEnergyOriginalEl = document.getElementById('adjPopEnergyOriginal');
     const popEnergyValueEl = document.getElementById('adjPopEnergyValue');
     const popEnergyBreakdownEl = document.getElementById('adjPopEnergyBreakdown');
-
-    const perProvinceEnergy = snapshot.perProvinceEnergy || [];
-    if(perProvinceEnergy.length === 0){
+    if(!totals.energy){
       const fallback = snapshot.energyProduction || '\u2014';
       popEnergyOriginalEl.textContent = fallback;
       popEnergyValueEl.textContent = fallback;
       popEnergyBreakdownEl.textContent = 'Per-province data isn\u2019t available for this claim, so the population ' +
         'adjustment can\u2019t be calculated - showing the original total unchanged.';
-      return;
-    }
-
-    const energySpecResult = applyEnergySpecializationAdjustments(perProvinceEnergy, chosenSpecs);
-    const popEnergyResult = applyPopulationEnergyAdjustment(energySpecResult.adjustedTotal, populationPercent);
-    popEnergyOriginalEl.textContent = formatEnergyValue(energySpecResult.adjustedTotal);
-    popEnergyValueEl.textContent = formatEnergyValue(popEnergyResult.adjustedTotal);
-
-    if(populationPercent === 0){
-      popEnergyBreakdownEl.textContent = 'Stable population - no additional Energy Production change.';
     } else {
-      popEnergyBreakdownEl.textContent = (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' +
-        formatEnergyValue(popEnergyResult.adjustedTotal) + ' net.';
+      popEnergyOriginalEl.textContent = formatEnergyValue(totals.energy.step3Total);
+      popEnergyValueEl.textContent = formatEnergyValue(totals.energy.adjustedTotal);
+      popEnergyBreakdownEl.textContent = populationPercent === 0
+        ? 'Stable population - no additional Energy Production change.'
+        : (populationPercent > 0 ? '+' : '') + populationPercent + '% population \u2192 ' + formatEnergyValue(totals.energy.adjustedTotal) + ' net.';
     }
+
+    updateSnapshotBox(totals);
   }
 
   specPopAdjustEl.addEventListener('change', renderPopulationAdjustment);
+  updateSnapshotBox(computeCurrentAdjustments());
 
   // ---- Step 5: National Identity + Citizen Card BBC ----
   //

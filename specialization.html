@@ -30,7 +30,7 @@
          page builds on top of these, it doesn't change them. -->
     <div class="spec-card spec-snapshot">
       <div class="snapshot-grid">
-        <div class="snapshot-item"><span class="snapshot-label">Nation</span><span class="snapshot-value" id="snapNation">&mdash;</span></div>
+        <div class="snapshot-item"><span class="snapshot-label">Provinces</span><span class="snapshot-value" id="snapProvinces">&mdash;</span></div>
         <div class="snapshot-item"><span class="snapshot-label">Economy Type</span><span class="snapshot-value" id="snapEconomy">&mdash;</span></div>
         <div class="snapshot-item"><span class="snapshot-label">Population</span><span class="snapshot-value" id="snapPopulation">&mdash;</span></div>
         <div class="snapshot-item"><span class="snapshot-label">GDP</span><span class="snapshot-value" id="snapGDP">&mdash;</span></div>
@@ -123,8 +123,8 @@
     <!-- ===== Step 4: Adjust Population ===== -->
     <div class="spec-card step-panel" id="step4" data-step-panel="4" hidden>
       <h2>Step 4 &middot; Adjust Population</h2>
-      <p class="step-intro">Choosing a population level away from your stable population affects GDP, Food
-        Production, and Energy Production below.</p>
+      <p class="step-intro">Choosing a population level away from your stable population shows the resulting
+        headcount below, along with how it affects GDP, Food Production, and Energy Production.</p>
       <div class="pop-adjust-row">
         <label for="specPopAdjust">Population level</label>
         <select id="specPopAdjust">
@@ -153,6 +153,15 @@
         </select>
       </div>
       <div class="adjust-row">
+        <div class="adjust-field">
+          <label>Population</label>
+          <div class="adjust-result">
+            <span class="adjust-original" id="adjPopulationOriginal">&mdash;</span>
+            <span class="adjust-arrow">&rarr;</span>
+            <span class="adjust-value" id="adjPopulationValue">&mdash;</span>
+          </div>
+          <div class="adjust-breakdown" id="adjPopulationBreakdown"><!-- populated by specialization.js --></div>
+        </div>
         <div class="adjust-field">
           <label>GDP</label>
           <div class="adjust-result">
