@@ -832,7 +832,7 @@
 [*]Air Force: {{AIR_FORCE}}
 [*]Expeditionary: {{EXPEDITIONARY}}
 [*]Paramilitary: {{PARAMILITARY}}[/list][/td]
-[/tr][/table][/spoiler]
+[/tr][/table][/spoiler[delete this]]
 
 [url=DISPATCH HERE]Full Citizen Application[/url]
 [url=IIWIKI LINK (Optional but encouraged)]IIWiki Page[/url]
@@ -914,7 +914,7 @@
       snapshot.claimCode || '',
     ].join('\n');
 
-    return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo + '\n[/spoiler]';
+    return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo;
   }
 
   // ---- Full Application BBC generator ----
