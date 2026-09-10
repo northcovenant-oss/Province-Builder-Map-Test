@@ -590,14 +590,19 @@
       '  .copy-btn{ font-family:var(--font-display); font-size:12.5px; letter-spacing:0.4px; padding:8px 14px; border-radius:4px; border:1px solid var(--line); cursor:pointer; background:var(--panel-bg); color:var(--ink); margin-top:9px; }\n' +
       '  .copy-btn.copied{ background:var(--gold); color:#fff; border-color:var(--gold); }\n' +
       '  #bbcSource{ position:absolute; left:-9999px; top:-9999px; }\n' +
+      '  .site-credit{ position:fixed; top:14px; right:18px; font-family:var(--font-body); font-size:11.5px; color:var(--ink-soft); text-align:right; max-width:230px; line-height:1.4; z-index:10; }\n' +
+      '  .site-credit a{ color:var(--gold); text-decoration:none; }\n' +
+      '  .site-credit a:hover{ text-decoration:underline; }\n' +
       '  @media (max-width:480px){\n' +
       '    body.bio-page{ padding:20px 12px; }\n' +
       '    .bio-card{ padding:22px 18px; }\n' +
       '    .bio-card h1{ font-size:20px; }\n' +
       '    .claim-map .map-row{ flex-direction:column; }\n' +
+      '    .site-credit{ position:static; max-width:none; text-align:center; margin-bottom:14px; }\n' +
       '  }\n' +
       '</style>\n</head>\n' +
       '<body class="bio-page ' + themeClass + '">\n' +
+      '  <div class="site-credit">Originally built for the <a href="https://www.nationstates.net/region=rylet" target="_blank" rel="noopener">Rylet Region</a> of NationStates</div>\n' +
       '  <div class="bio-card">\n' +
       '    <h1>Land Bio</h1>\n' +
       '    <div class="meta">' + escapeHtml(provinceList) + ' &middot; generated ' + escapeHtml(new Date().toLocaleString()) + '</div>\n' +
