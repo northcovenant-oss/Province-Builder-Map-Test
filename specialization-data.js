@@ -786,7 +786,7 @@ function applyPopulationAdjustment(originalGDP, populationPercent){
 // The model, in plain terms:
 //   - Growth (population >= stable): strain increases in three
 //     escalating tiers - a mild penalty up to +30% population, a much
-//     steeper one from +30% to +100%, and a severe one beyond +100%.
+//     steeper one from +30% to +60%, and a severe one beyond +60%.
 //   - Mild loss (down to -30% population): fewer consumers grows
 //     the surplus (or shrinks the deficit) at an accelerating-then-
 //     leveling rate.
@@ -799,7 +799,7 @@ function applyPopulationAdjustment(originalGDP, populationPercent){
 //     extreme population loss - losing everyone doesn't erase
 //     underlying production problems.
 const POP_PROD_GROWTH_TIER1_MAX = 0.30, POP_PROD_GROWTH_TIER1_RATE = 10;
-const POP_PROD_GROWTH_TIER2_MAX = 1.00, POP_PROD_GROWTH_TIER2_RATE = 100;
+const POP_PROD_GROWTH_TIER2_MAX = 0.60, POP_PROD_GROWTH_TIER2_RATE = 100;
 const POP_PROD_GROWTH_TIER3_RATE = 600;
 const POP_PROD_GROWTH_TIER1_PENALTY = POP_PROD_GROWTH_TIER1_RATE * POP_PROD_GROWTH_TIER1_MAX; // 3
 const POP_PROD_GROWTH_TIER2_PENALTY = POP_PROD_GROWTH_TIER2_RATE * (POP_PROD_GROWTH_TIER2_MAX - POP_PROD_GROWTH_TIER1_MAX); // 70
@@ -813,7 +813,7 @@ function applyPopulationProductionAdjustment(currentValue, populationPercent){
     const growth = C3 - 1;
     if (growth <= POP_PROD_GROWTH_TIER1_MAX) {
       adjustedTotal = Math.round(B17 - POP_PROD_GROWTH_TIER1_RATE * growth);
-    } else if (C3 <= 2.00) {
+    } else if (growth <= POP_PROD_GROWTH_TIER2_MAX) {
       adjustedTotal = Math.round(B17 - (POP_PROD_GROWTH_TIER1_PENALTY + POP_PROD_GROWTH_TIER2_RATE * (growth - POP_PROD_GROWTH_TIER1_MAX)));
     } else {
       adjustedTotal = Math.round(B17 - (POP_PROD_GROWTH_TIER1_PENALTY + POP_PROD_GROWTH_TIER2_PENALTY + POP_PROD_GROWTH_TIER3_RATE * (growth - POP_PROD_GROWTH_TIER2_MAX)));
