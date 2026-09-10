@@ -10,11 +10,39 @@ html, body {
 }
 
 body.spec-page {
+  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--parchment);
   padding: 32px 20px 60px;
   box-sizing: border-box;
+}
+
+.credit-link {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  max-width: 220px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-soft);
+  text-decoration: none;
+  text-align: right;
+}
+.credit-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+@media (max-width: 560px) {
+  .credit-link {
+    position: static;
+    display: block;
+    max-width: none;
+    text-align: center;
+    margin-bottom: 12px;
+  }
 }
 
 .spec-wrap {
