@@ -914,7 +914,7 @@
       snapshot.claimCode || '',
     ].join('\n');
 
-    return card + '\n\n[spoiler=for admin team usage]\n' + adminInfo;
+    return card + '\n\n[/spoiler]\n\n[spoiler=for admin team usage]\n' + adminInfo + '\n[/spoiler]';
   }
 
   // ---- Full Application BBC generator ----
