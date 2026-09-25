@@ -49,41 +49,51 @@
   defs.appendChild(pattern);
   svg.appendChild(defs);
 
-  const g = document.createElementNS(NS, 'g');
-  g.setAttribute('transform', NORTH_TRANSFORM);
-  svg.appendChild(g);
+  // ---- Continents ----
+  // data.js lists its continents in CONTINENTS = [{ id, label, transform }].
+  // Older data files only had NORTH_TRANSFORM / SOUTH_TRANSFORM, so fall back
+  // to those when CONTINENTS isn't defined.
+  const CONTINENT_LIST = (typeof CONTINENTS !== 'undefined') ? CONTINENTS : [
+    { id: 'north', label: 'Northern Continent', transform: (typeof NORTH_TRANSFORM !== 'undefined') ? NORTH_TRANSFORM : '' },
+    { id: 'south', label: 'Southern Continent', transform: (typeof SOUTH_TRANSFORM !== 'undefined') ? SOUTH_TRANSFORM : '' },
+    { id: 'southcentral', label: 'South Central Continent', transform: (typeof SOUTHCENTRAL_TRANSFORM !== 'undefined') ? SOUTHCENTRAL_TRANSFORM : '' }
+  ];
 
-  const gSouth = document.createElementNS(NS, 'g');
-  if(SOUTH_TRANSFORM){ gSouth.setAttribute('transform', SOUTH_TRANSFORM); }
-  svg.appendChild(gSouth);
-
-  const gSouthCentral = document.createElementNS(NS, 'g');
-  if(typeof SOUTHCENTRAL_TRANSFORM !== 'undefined' && SOUTHCENTRAL_TRANSFORM){
-    gSouthCentral.setAttribute('transform', SOUTHCENTRAL_TRANSFORM);
-  }
-  svg.appendChild(gSouthCentral);
+  // Land that has no provinces yet (whole continents still to be divided):
+  // drawn underneath everything, greyed out, visible on every layer, never clickable.
+  const gPending = document.createElementNS(NS, 'g');
+  svg.appendChild(gPending);
 
   // One <g> per continent, each carrying that continent's own transform.
-  const CONTINENT_GROUPS = { north: g, south: gSouth, southcentral: gSouthCentral };
-  const CONTINENT_TRANSFORMS = {
-    north: NORTH_TRANSFORM,
-    south: SOUTH_TRANSFORM,
-    southcentral: (typeof SOUTHCENTRAL_TRANSFORM !== 'undefined') ? SOUTHCENTRAL_TRANSFORM : ''
-  };
-  const CONTINENT_LABELS = { north: 'Northern Continent', south: 'Southern Continent', southcentral: 'South Central Continent' };
-  const CONTINENT_ORDER = ['north', 'south', 'southcentral'];
+  const CONTINENT_GROUPS = {}, CONTINENT_TRANSFORMS = {}, CONTINENT_LABELS = {};
+  const CONTINENT_ORDER = [];
+  CONTINENT_LIST.forEach(function(c){
+    const cg = document.createElementNS(NS, 'g');
+    if(c.transform){ cg.setAttribute('transform', c.transform); }
+    svg.appendChild(cg);
+    CONTINENT_GROUPS[c.id] = cg;
+    CONTINENT_TRANSFORMS[c.id] = c.transform || '';
+    CONTINENT_LABELS[c.id] = c.label || c.id;
+    CONTINENT_ORDER.push(c.id);
+  });
+  const g = CONTINENT_GROUPS[CONTINENT_ORDER[0]];
   const LAKE_LIST = (typeof LAKES !== 'undefined') ? LAKES : [];
+  // Claim seals are sized in map units; SEAL_SIZE (data.js) scales them to suit
+  // how big provinces are in this map's coordinate space.
+  const SEAL_SCALE = (typeof SEAL_SIZE !== 'undefined') ? SEAL_SIZE : 1;
 
   function groupFor(p){ return CONTINENT_GROUPS[p.continent] || g; }
 
-  // Extra non-clickable, greyed islands (from raster, not in vector province data)
+  // Extra non-clickable, greyed land: small islands (shown on the Provinces
+  // layer only) and pending continents (always shown, in gPending).
   const gExtra = document.createElementNS(NS, 'g');
   svg.appendChild(gExtra);
   EXTRA_ISLANDS.forEach(function(isl){
     const el = document.createElementNS(NS, 'path');
     el.setAttribute('d', isl.d);
-    el.setAttribute('class', 'extra-island');
-    gExtra.appendChild(el);
+    if(isl.transform){ el.setAttribute('transform', isl.transform); }
+    el.setAttribute('class', 'extra-island' + (isl.pending ? ' pending-land' : ''));
+    (isl.pending ? gPending : gExtra).appendChild(el);
   });
 
   // selection order: array of province ids, in click order
@@ -342,12 +352,12 @@
       const isCapital = id === capitalId;
       const seal = document.createElementNS(NS, 'g');
       seal.setAttribute('class', 'seal' + (isCapital ? ' seal-capital' : ''));
-      const r = isCapital ? 6.4 : 5.2;
+      const r = (isCapital ? 6.4 : 5.2) * SEAL_SCALE;
       const circle = document.createElementNS(NS, 'circle');
       circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', r);
       const text = document.createElementNS(NS, 'text');
       text.setAttribute('x', c.x); text.setAttribute('y', c.y);
-      text.setAttribute('font-size', isCapital ? '7.5' : '6.5');
+      text.setAttribute('font-size', String((isCapital ? 7.5 : 6.5) * SEAL_SCALE));
       text.textContent = isCapital ? '\u2605' : (i+1);
       seal.appendChild(circle);
       seal.appendChild(text);
@@ -451,9 +461,10 @@
   // side if it spans both.
   function buildClaimMapHtml(provinces){
     if(!provinces.length) return '';
-    const byContinent = { north: [], south: [], southcentral: [] };
+    const byContinent = {};
+    CONTINENT_ORDER.forEach(function(c){ byContinent[c] = []; });
     provinces.forEach(function(p){
-      (byContinent[p.continent] || byContinent.north).push(p.id);
+      (byContinent[p.continent] || byContinent[CONTINENT_ORDER[0]]).push(p.id);
     });
 
     const shots = [];
