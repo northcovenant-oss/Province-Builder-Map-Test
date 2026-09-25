@@ -24,7 +24,9 @@
     { id: 'provinces', label: 'Provinces', type: 'neutral' },
     { id: 'economic',  label: 'Economic Output', type: 'data' },
     { id: 'climate',   label: 'Climate', type: 'climate' },
-    { id: 'terrain',   label: 'Terrain', type: 'placeholder' }
+    // Terrain shows the topography image (TERRAIN_IMAGE in data.js) under the
+    // province borders; without an image it falls back to the placeholder hatch.
+    { id: 'terrain',   label: 'Terrain', type: (typeof TERRAIN_IMAGE !== 'undefined') ? 'image' : 'placeholder' }
   ];
   let activeLayer = LAYERS[0];
 
@@ -63,6 +65,21 @@
   // drawn underneath everything, greyed out, visible on every layer, never clickable.
   const gPending = document.createElementNS(NS, 'g');
   svg.appendChild(gPending);
+
+  // Topography backdrop for the Terrain layer (hidden on the other layers).
+  const gTerrain = document.createElementNS(NS, 'g');
+  gTerrain.style.display = 'none';
+  if(typeof TERRAIN_IMAGE !== 'undefined'){
+    const im = document.createElementNS(NS, 'image');
+    im.setAttribute('href', TERRAIN_IMAGE.href);
+    im.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', TERRAIN_IMAGE.href);
+    im.setAttribute('x', TERRAIN_IMAGE.x); im.setAttribute('y', TERRAIN_IMAGE.y);
+    im.setAttribute('width', TERRAIN_IMAGE.width); im.setAttribute('height', TERRAIN_IMAGE.height);
+    im.setAttribute('preserveAspectRatio', 'none');
+    im.style.pointerEvents = 'none';
+    gTerrain.appendChild(im);
+  }
+  svg.appendChild(gTerrain);
 
   // One <g> per continent, each carrying that continent's own transform.
   const CONTINENT_GROUPS = {}, CONTINENT_TRANSFORMS = {}, CONTINENT_LABELS = {};
@@ -235,6 +252,8 @@
       else if(layer.type === 'climate'){
         fill = p.climate ? CLIMATE_COLOR[p.climate.dominant] : '#cabf9e';
       }
+      // see-through (but still clickable) so the topography shows beneath the borders
+      else if(layer.type === 'image'){ fill = 'rgba(0,0,0,0)'; }
       else { fill = 'url(#noDataHatch)'; }
       el.setAttribute('fill', fill);
     });
@@ -243,11 +262,16 @@
     if(layer.type === 'placeholder'){
       noDataBanner.textContent = 'No ' + layer.label.toLowerCase() + ' data yet \u2014 this layer is a placeholder. Provinces are still selectable.';
     }
-    legend.classList.toggle('show', layer.type === 'data' || layer.type === 'climate');
+    const terrainLegend = (typeof TERRAIN_LEGEND !== 'undefined') ? TERRAIN_LEGEND : null;
+    legend.classList.toggle('show', layer.type === 'data' || layer.type === 'climate' || (layer.type === 'image' && !!terrainLegend));
     legend.innerHTML = '';
-    const activeLegendData = layer.type === 'climate' ? CLIMATE_LEGEND : (layer.type === 'data' ? ECON_LEGEND : null);
+    const activeLegendData = layer.type === 'climate' ? CLIMATE_LEGEND
+      : (layer.type === 'data' ? ECON_LEGEND : (layer.type === 'image' ? terrainLegend : null));
     if(activeLegendData){ buildLegend(activeLegendData, layer.type); }
     gExtra.style.display = (layer.id === 'provinces') ? '' : 'none';
+    // the topography image already shows all land, so the greyed placeholder land is hidden there
+    gTerrain.style.display = (layer.type === 'image') ? '' : 'none';
+    gPending.style.display = (layer.type === 'image') ? 'none' : '';
   }
 
   // ---- Legends ----
@@ -257,12 +281,12 @@
 
   function buildLegend(items, type){
     items.forEach(function(item){
-      const key = type === 'climate' ? item.climate : item.econ;
+      const key = type === 'climate' ? item.climate : (type === 'image' ? item.terrain : item.econ);
       const row = document.createElement('div');
       row.className = 'legend-row';
-      const present = type === 'climate'
+      const present = type === 'image' ? true : (type === 'climate'
         ? PROVINCES.some(function(p){ return p.climate && p.climate.dominant === key; })
-        : PROVINCES.some(function(p){ return p.econ === key; });
+        : PROVINCES.some(function(p){ return p.econ === key; }));
       row.innerHTML =
         '<span class="legend-swatch" style="background:'+item.color+'"></span>' +
         '<span class="legend-label">'+key+'</span>' +
@@ -287,6 +311,10 @@
       } else {
         sub = 'No climate data';
       }
+    } else if(activeLayer.id === 'terrain' && p.geo && p.geo.elevation){
+      sub = Object.entries(p.geo.elevation)
+        .sort(function(a,b){ return b[1]-a[1]; })
+        .map(function(kv){ return kv[0]+' '+kv[1]+'%'; }).join(', ');
     } else {
       sub = selected.indexOf(p.id) !== -1 ? 'Claimed \u2014 click to release' : 'Click to claim';
     }
