@@ -57,7 +57,24 @@
   if(SOUTH_TRANSFORM){ gSouth.setAttribute('transform', SOUTH_TRANSFORM); }
   svg.appendChild(gSouth);
 
-  function groupFor(p){ return p.continent === 'south' ? gSouth : g; }
+  const gSouthCentral = document.createElementNS(NS, 'g');
+  if(typeof SOUTHCENTRAL_TRANSFORM !== 'undefined' && SOUTHCENTRAL_TRANSFORM){
+    gSouthCentral.setAttribute('transform', SOUTHCENTRAL_TRANSFORM);
+  }
+  svg.appendChild(gSouthCentral);
+
+  // One <g> per continent, each carrying that continent's own transform.
+  const CONTINENT_GROUPS = { north: g, south: gSouth, southcentral: gSouthCentral };
+  const CONTINENT_TRANSFORMS = {
+    north: NORTH_TRANSFORM,
+    south: SOUTH_TRANSFORM,
+    southcentral: (typeof SOUTHCENTRAL_TRANSFORM !== 'undefined') ? SOUTHCENTRAL_TRANSFORM : ''
+  };
+  const CONTINENT_LABELS = { north: 'Northern Continent', south: 'Southern Continent', southcentral: 'South Central Continent' };
+  const CONTINENT_ORDER = ['north', 'south', 'southcentral'];
+  const LAKE_LIST = (typeof LAKES !== 'undefined') ? LAKES : [];
+
+  function groupFor(p){ return CONTINENT_GROUPS[p.continent] || g; }
 
   // Extra non-clickable, greyed islands (from raster, not in vector province data)
   const gExtra = document.createElementNS(NS, 'g');
@@ -85,6 +102,17 @@
     el.addEventListener('mouseleave', hideTooltip);
     groupFor(p).appendChild(el);
     provinceEls[p.id] = el;
+  });
+
+  // Lakes sit on top of the provinces (which already have matching holes cut
+  // in them) purely as water colour - they're not clickable.
+  LAKE_LIST.forEach(function(l){
+    const el = document.createElementNS(NS, 'path');
+    el.setAttribute('d', l.d);
+    el.setAttribute('class', 'lake');
+    el.style.fill = 'var(--lake-fill, #8fbcd8)';
+    el.style.pointerEvents = 'none';
+    (CONTINENT_GROUPS[l.continent] || g).appendChild(el);
   });
 
   const byId = {};
@@ -304,8 +332,9 @@
     });
 
     // seals (order badges, or a star for the capital) - remove old, redraw
-    Array.from(g.querySelectorAll('.seal')).forEach(function(n){ n.remove(); });
-    Array.from(gSouth.querySelectorAll('.seal')).forEach(function(n){ n.remove(); });
+    Object.keys(CONTINENT_GROUPS).forEach(function(k){
+      Array.from(CONTINENT_GROUPS[k].querySelectorAll('.seal')).forEach(function(n){ n.remove(); });
+    });
     selected.forEach(function(id, i){
       const p = byId[id];
       const c = centroid(p.d);
@@ -422,18 +451,18 @@
   // side if it spans both.
   function buildClaimMapHtml(provinces){
     if(!provinces.length) return '';
-    const byContinent = { north: [], south: [] };
+    const byContinent = { north: [], south: [], southcentral: [] };
     provinces.forEach(function(p){
       (byContinent[p.continent] || byContinent.north).push(p.id);
     });
 
     const shots = [];
-    ['north','south'].forEach(function(continentName){
+    CONTINENT_ORDER.forEach(function(continentName){
       const ids = byContinent[continentName];
       if(!ids || !ids.length) return;
       const svg = buildClaimSnapshotSVG(continentName, ids);
       if(!svg) return;
-      const label = continentName === 'north' ? 'Northern Continent' : 'Southern Continent';
+      const label = CONTINENT_LABELS[continentName] || continentName;
       shots.push('<div class="map-shot">' + svg + '<div class="map-shot-label">' + label + '</div></div>');
     });
 
@@ -762,7 +791,7 @@
   const continentBBoxCache = {};
   function getContinentBBox(continentName){
     if(continentBBoxCache[continentName]) return continentBBoxCache[continentName];
-    const tfStr = continentName === 'south' ? SOUTH_TRANSFORM : NORTH_TRANSFORM;
+    const tfStr = CONTINENT_TRANSFORMS[continentName];
     const m = tfStr && tfStr.match(/translate\(([-\d.]+),([-\d.]+)\)/);
     const tx = m ? parseFloat(m[1]) : 0;
     const ty = m ? parseFloat(m[2]) : 0;
@@ -808,6 +837,9 @@
         ? 'stroke="#e0a83e" stroke-width="1.6"'
         : 'stroke="#2c2417" stroke-width="0.5"';
       paths += `<path d="${p.d}" fill="${neutralFill}" ${strokeCls}/>`;
+    });
+    LAKE_LIST.forEach(function(l){
+      if(l.continent === continentName) paths += `<path d="${l.d}" fill="#8fbcd8"/>`;
     });
 
     return `<svg viewBox="${bb.minX-pad} ${bb.minY-pad} ${w} ${h}" xmlns="http://www.w3.org/2000/svg">` +
