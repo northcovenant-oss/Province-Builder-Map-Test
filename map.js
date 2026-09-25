@@ -67,6 +67,7 @@
   svg.appendChild(gPending);
 
   // Topography backdrop for the Terrain layer (hidden on the other layers).
+  let terrainImageFailed = false;
   const gTerrain = document.createElementNS(NS, 'g');
   gTerrain.style.display = 'none';
   if(typeof TERRAIN_IMAGE !== 'undefined'){
@@ -77,6 +78,12 @@
     im.setAttribute('width', TERRAIN_IMAGE.width); im.setAttribute('height', TERRAIN_IMAGE.height);
     im.setAttribute('preserveAspectRatio', 'none');
     im.style.pointerEvents = 'none';
+    // if the image can't be loaded, say so on the Terrain layer instead of failing silently
+    im.addEventListener('error', function(){
+      terrainImageFailed = true;
+      console.warn('Terrain image failed to load:', String(TERRAIN_IMAGE.href).slice(0, 80));
+      if(activeLayer && activeLayer.type === 'image'){ setLayer(activeLayer); }
+    });
     gTerrain.appendChild(im);
   }
   svg.appendChild(gTerrain);
@@ -258,9 +265,12 @@
       el.setAttribute('fill', fill);
     });
     applyTakenStyling();
-    noDataBanner.classList.toggle('show', layer.type === 'placeholder');
+    const imageMissing = layer.type === 'image' && terrainImageFailed;
+    noDataBanner.classList.toggle('show', layer.type === 'placeholder' || imageMissing);
     if(layer.type === 'placeholder'){
       noDataBanner.textContent = 'No ' + layer.label.toLowerCase() + ' data yet \u2014 this layer is a placeholder. Provinces are still selectable.';
+    } else if(imageMissing){
+      noDataBanner.textContent = 'The terrain image could not be loaded. Provinces are still selectable.';
     }
     const terrainLegend = (typeof TERRAIN_LEGEND !== 'undefined') ? TERRAIN_LEGEND : null;
     legend.classList.toggle('show', layer.type === 'data' || layer.type === 'climate' || (layer.type === 'image' && !!terrainLegend));
