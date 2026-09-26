@@ -11,6 +11,11 @@
   const generateBtn = document.getElementById('generateBtn');
 
   const NS = 'http://www.w3.org/2000/svg';
+  // Sea and lakes share one water colour: the shallow-water blue of the topography map.
+  // (WATER_COLOR in data.js can override it.)
+  const WATER = (typeof WATER_COLOR !== 'undefined') ? WATER_COLOR : '#bae3ff';
+  if (mapFrame) mapFrame.style.background = WATER;
+  if (svg) svg.style.background = WATER;
 
   // ---- Layers ----
   function getNeutralFill(){
@@ -144,7 +149,7 @@
     const el = document.createElementNS(NS, 'path');
     el.setAttribute('d', l.d);
     el.setAttribute('class', 'lake');
-    el.style.fill = 'var(--lake-fill, #8fbcd8)';
+    el.style.fill = WATER;
     el.style.pointerEvents = 'none';
     (CONTINENT_GROUPS[l.continent] || g).appendChild(el);
   });
@@ -888,10 +893,10 @@
       paths += `<path d="${p.d}" fill="${neutralFill}" ${strokeCls}/>`;
     });
     LAKE_LIST.forEach(function(l){
-      if(l.continent === continentName) paths += `<path d="${l.d}" fill="#8fbcd8"/>`;
+      if(l.continent === continentName) paths += `<path d="${l.d}" fill="${WATER}"/>`;
     });
 
-    return `<svg viewBox="${bb.minX-pad} ${bb.minY-pad} ${w} ${h}" xmlns="http://www.w3.org/2000/svg">` +
+    return `<svg viewBox="${bb.minX-pad} ${bb.minY-pad} ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="background:${WATER}">` +
       `<g transform="translate(${bb.tx},${bb.ty})">${paths}</g></svg>`;
   }
 
