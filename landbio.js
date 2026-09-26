@@ -462,7 +462,7 @@ const ECON_SECTOR_CONFIG = {
 const LIGHT_INDUSTRY_FACTOR = {
   "Service Focused":      0.75,
   "Service Oriented":     0.50,
-  "Production Focused":   0.25,
+  "Production Focused":   0.40,
   "Energy Focused":       0.10,
   "Energy Oriented":      0.20,
   "Agriculture Focused":  0.75,
@@ -836,6 +836,21 @@ const ECONOMY_TYPES = [
   { name: "Non-Industrial Economy",              tier: 2, pct: t => t.Services + t.Extraction },
 ];
 
+// Non-Industrial is reserved for genuinely low-industry, extraction-driven
+// economies (petro-states and similar). Without this gate it wins far too
+// often: Manufacturing is split into Light + Heavy, so any Services +
+// Extraction pairing out-scores every pairing that uses only one half of
+// Manufacturing - even when total Manufacturing is as large as either.
+// Claims that fail the gate fall through to the next-best tier 2 pairing.
+const NON_INDUSTRIAL_MAX_MANUFACTURING = 25;
+const NON_INDUSTRIAL_MIN_EXTRACTION = 35;
+
+function qualifiesAsNonIndustrial(sectorTotals) {
+  const manufacturing = (sectorTotals.LightIndustry || 0) + (sectorTotals.HeavyIndustry || 0);
+  return manufacturing <= NON_INDUSTRIAL_MAX_MANUFACTURING &&
+    (sectorTotals.Extraction || 0) >= NON_INDUSTRIAL_MIN_EXTRACTION;
+}
+
 function classifyEconomy(sectorTotals) {
   const tier1 = ECONOMY_TYPES.filter(e => e.tier === 1)
     .map(e => ({ name: e.name, pct: e.pct(sectorTotals) }))
@@ -844,6 +859,7 @@ function classifyEconomy(sectorTotals) {
   const pool = tier1.length > 0
     ? tier1
     : ECONOMY_TYPES.filter(e => e.tier === 2)
+        .filter(e => e.name !== "Non-Industrial Economy" || qualifiesAsNonIndustrial(sectorTotals))
         .map(e => ({ name: e.name, pct: e.pct(sectorTotals) }))
         .filter(e => e.pct > 50);
 
